@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
   authApi,
@@ -527,7 +527,11 @@ function DashboardPage() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (loading) {
+      return
+    }
+
     const formRoot = dashboardFormRef.current
     if (!formRoot) {
       return
@@ -566,7 +570,7 @@ function DashboardPage() {
       formRoot.removeEventListener('input', applyEmptyIndicators)
       formRoot.removeEventListener('change', applyEmptyIndicators)
     }
-  }, [formData, openSections])
+  }, [formData, openSections, loading])
 
   function renderSectionStatus(sectionKey) {
     const emptyCount = sectionEmptyCounts[sectionKey] ?? 0
