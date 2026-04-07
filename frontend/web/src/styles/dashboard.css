@@ -32,6 +32,34 @@
         font-weight: 600;
     }
 
+    .section-header-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .section-status {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 999px;
+        white-space: nowrap;
+        line-height: 1;
+    }
+
+    .section-status.complete {
+        color: var(--success-color);
+        background-color: rgba(45, 134, 89, 0.14);
+        border: 1px solid rgba(45, 134, 89, 0.25);
+    }
+
+    .section-status.incomplete {
+        color: var(--warning-color);
+        background-color: rgba(245, 124, 0, 0.12);
+        border: 1px solid rgba(245, 124, 0, 0.25);
+    }
+
     .section-toggle {
         font-size: 1.5rem;
         transition: transform 0.3s ease;
@@ -57,6 +85,17 @@
 
     .section-content.active {
         display: block;
+    }
+
+    .field-empty {
+        border-color: var(--warning-color) !important;
+        box-shadow: inset 0 0 0 1px rgba(245, 124, 0, 0.2);
+        background-image: linear-gradient(to right, rgba(245, 124, 0, 0.08), rgba(245, 124, 0, 0.03));
+    }
+
+    [data-theme="dark"] .field-empty {
+        box-shadow: inset 0 0 0 1px rgba(255, 152, 0, 0.35);
+        background-image: linear-gradient(to right, rgba(255, 152, 0, 0.14), rgba(255, 152, 0, 0.05));
     }
 
     .form-row {
@@ -96,6 +135,11 @@
 
         .section-header h3 {
             font-size: 1rem;
+        }
+
+        .section-header-main {
+            flex-wrap: wrap;
+            gap: 8px;
         }
     }
 

@@ -407,6 +407,7 @@ function DashboardPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const importFileRef = useRef(null)
+  const dashboardFormRef = useRef(null)
   const [user] = useState(() => getCurrentUser())
   const [formData, setFormData] = useState(createEmptyForm())
   const [openSections, setOpenSections] = useState({
@@ -429,6 +430,7 @@ function DashboardPage() {
   const [showInactivityModal, setShowInactivityModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
+  const [sectionEmptyCounts, setSectionEmptyCounts] = useState({})
 
   const formDataRef = useRef(formData)
   const dirtyRef = useRef(isDirty)
@@ -524,6 +526,57 @@ function DashboardPage() {
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [])
+
+  useEffect(() => {
+    const formRoot = dashboardFormRef.current
+    if (!formRoot) {
+      return
+    }
+
+    const selector = 'input[type="text"], input[type="number"], input[type="date"], select, textarea'
+
+    const applyEmptyIndicators = () => {
+      const fields = formRoot.querySelectorAll(selector)
+
+      fields.forEach((field) => {
+        const value = typeof field.value === 'string' ? field.value.trim() : ''
+        field.classList.toggle('field-empty', value === '')
+      })
+
+      const nextCounts = {}
+      const sections = formRoot.querySelectorAll('[data-section]')
+
+      sections.forEach((section) => {
+        const key = section.dataset.section
+        if (!key) {
+          return
+        }
+
+        nextCounts[key] = section.querySelectorAll('.field-empty').length
+      })
+
+      setSectionEmptyCounts(nextCounts)
+    }
+
+    applyEmptyIndicators()
+    formRoot.addEventListener('input', applyEmptyIndicators)
+    formRoot.addEventListener('change', applyEmptyIndicators)
+
+    return () => {
+      formRoot.removeEventListener('input', applyEmptyIndicators)
+      formRoot.removeEventListener('change', applyEmptyIndicators)
+    }
+  }, [formData, openSections])
+
+  function renderSectionStatus(sectionKey) {
+    const emptyCount = sectionEmptyCounts[sectionKey] ?? 0
+
+    if (emptyCount === 0) {
+      return <span className="section-status complete">Complete</span>
+    }
+
+    return <span className="section-status incomplete">{emptyCount} empty</span>
+  }
 
   function updateForm(updater) {
     setStatusSaved(false)
@@ -819,7 +872,7 @@ function DashboardPage() {
         </div>
       </nav>
 
-      <div className="container" style={{ paddingTop: '32px', paddingBottom: '80px' }}>
+      <div className="container" style={{ paddingTop: '32px', paddingBottom: '80px' }} ref={dashboardFormRef}>
         {notice ? <div className={`alert alert-${noticeType === 'error' ? 'error' : noticeType === 'success' ? 'success' : 'info'}`}>{notice}</div> : null}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
@@ -829,9 +882,16 @@ function DashboardPage() {
           </p>
         </div>
 
-        <div className="form-section">
+        <p className="form-help" style={{ marginBottom: '20px' }}>
+          Empty fields are highlighted so you can quickly spot unfinished items.
+        </p>
+
+        <div className="form-section" data-section="formInfo">
           <div className="section-header" onClick={() => toggleSection('formInfo')}>
-            <h3>Form Information</h3>
+            <div className="section-header-main">
+              <h3>Form Information</h3>
+              {renderSectionStatus('formInfo')}
+            </div>
             <span className="section-toggle">{openSections.formInfo ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.formInfo ? 'active' : ''}`}>
@@ -894,9 +954,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="personal">
           <div className="section-header" onClick={() => toggleSection('personal')}>
-            <h3>Personal Information</h3>
+            <div className="section-header-main">
+              <h3>Personal Information</h3>
+              {renderSectionStatus('personal')}
+            </div>
             <span className="section-toggle">{openSections.personal ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.personal ? 'active' : ''}`}>
@@ -984,9 +1047,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="spouse">
           <div className="section-header" onClick={() => toggleSection('spouse')}>
-            <h3>Spouse Information</h3>
+            <div className="section-header-main">
+              <h3>Spouse Information</h3>
+              {renderSectionStatus('spouse')}
+            </div>
             <span className="section-toggle">{openSections.spouse ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.spouse ? 'active' : ''}`}>
@@ -994,10 +1060,10 @@ function DashboardPage() {
               <label>
                 <input
                   type="checkbox"
-                  checked={!!formData.spouse}
-                  onChange={(e) => setSpouseEnabled(e.target.checked)}
+                  checked={!formData.spouse}
+                  onChange={(e) => setSpouseEnabled(!e.target.checked)}
                 />{' '}
-                I have a spouse
+                N/A
               </label>
             </div>
             {formData.spouse ? (
@@ -1062,9 +1128,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="children">
           <div className="section-header" onClick={() => toggleSection('children')}>
-            <h3>Children Below 18</h3>
+            <div className="section-header-main">
+              <h3>Children Below 18</h3>
+              {renderSectionStatus('children')}
+            </div>
             <span className="section-toggle">{openSections.children ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.children ? 'active' : ''}`}>
@@ -1113,9 +1182,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="realProperties">
           <div className="section-header" onClick={() => toggleSection('realProperties')}>
-            <h3>Real Properties</h3>
+            <div className="section-header-main">
+              <h3>Real Properties</h3>
+              {renderSectionStatus('realProperties')}
+            </div>
             <span className="section-toggle">{openSections.realProperties ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.realProperties ? 'active' : ''}`}>
@@ -1272,9 +1344,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="personalProperties">
           <div className="section-header" onClick={() => toggleSection('personalProperties')}>
-            <h3>Personal Properties</h3>
+            <div className="section-header-main">
+              <h3>Personal Properties</h3>
+              {renderSectionStatus('personalProperties')}
+            </div>
             <span className="section-toggle">{openSections.personalProperties ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.personalProperties ? 'active' : ''}`}>
@@ -1346,9 +1421,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="liabilities">
           <div className="section-header" onClick={() => toggleSection('liabilities')}>
-            <h3>Liabilities</h3>
+            <div className="section-header-main">
+              <h3>Liabilities</h3>
+              {renderSectionStatus('liabilities')}
+            </div>
             <span className="section-toggle">{openSections.liabilities ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.liabilities ? 'active' : ''}`}>
@@ -1411,9 +1489,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="business">
           <div className="section-header" onClick={() => toggleSection('business')}>
-            <h3>Business Interests and Financial Connections</h3>
+            <div className="section-header-main">
+              <h3>Business Interests and Financial Connections</h3>
+              {renderSectionStatus('business')}
+            </div>
             <span className="section-toggle">{openSections.business ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.business ? 'active' : ''}`}>
@@ -1421,17 +1502,18 @@ function DashboardPage() {
               <label>
                 <input
                   type="checkbox"
-                  checked={!!formData.business_interests.has_business_interest}
+                  checked={!formData.business_interests.has_business_interest}
                   onChange={(e) =>
                     updateForm((next) => {
-                      next.business_interests.has_business_interest = e.target.checked
-                      if (!e.target.checked) {
+                      const isNotApplicable = e.target.checked
+                      next.business_interests.has_business_interest = !isNotApplicable
+                      if (isNotApplicable) {
                         next.business_interests.entries = []
                       }
                     })
                   }
                 />{' '}
-                I have business interests or financial connections
+                N/A
               </label>
             </div>
 
@@ -1506,9 +1588,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="relatives">
           <div className="section-header" onClick={() => toggleSection('relatives')}>
-            <h3>Relatives in Government Service</h3>
+            <div className="section-header-main">
+              <h3>Relatives in Government Service</h3>
+              {renderSectionStatus('relatives')}
+            </div>
             <span className="section-toggle">{openSections.relatives ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.relatives ? 'active' : ''}`}>
@@ -1516,17 +1601,18 @@ function DashboardPage() {
               <label>
                 <input
                   type="checkbox"
-                  checked={!!formData.relatives_in_government.has_relatives}
+                  checked={!formData.relatives_in_government.has_relatives}
                   onChange={(e) =>
                     updateForm((next) => {
-                      next.relatives_in_government.has_relatives = e.target.checked
-                      if (!e.target.checked) {
+                      const isNotApplicable = e.target.checked
+                      next.relatives_in_government.has_relatives = !isNotApplicable
+                      if (isNotApplicable) {
                         next.relatives_in_government.entries = []
                       }
                     })
                   }
                 />{' '}
-                I have relatives in government service
+                N/A
               </label>
             </div>
 
@@ -1602,9 +1688,12 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="form-section">
+        <div className="form-section" data-section="certification">
           <div className="section-header" onClick={() => toggleSection('certification')}>
-            <h3>Certification</h3>
+            <div className="section-header-main">
+              <h3>Certification</h3>
+              {renderSectionStatus('certification')}
+            </div>
             <span className="section-toggle">{openSections.certification ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.certification ? 'active' : ''}`}>
