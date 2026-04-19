@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Jobs\GeneratePdfJob;
 
 use App\Models\Document;
 
@@ -20,13 +21,34 @@ class DocumentController extends Controller
         'status' => 'queued',
         ]);
 
-        GeneratePdfJob::dispatch($doc->id);
+        GeneratePdfJob::dispatch($doc->id, $request->user()->id);
     
         return response()->json([
             'success' => true,
             'document_id' => $doc->id,
             'status' => $doc->status,
         ], 202);
+    }
+
+    public function show(Request $request, int $id)
+    {
+        $doc = $request->user()
+            ->documents()
+            ->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $doc->id,
+                'status' => $doc->status,
+                'created_at' => $doc->created_at,
+                'updated_at' => $doc->updated_at,
+
+                // optional urls for the frontend
+                'preview_url' => url("/api/documents/{$doc->id}/preview"),
+                'download_url' => url("/api/documents/{$doc->id}/download"),
+            ],
+        ]);
     }
 
     public function preview(Request $request, int $id)
