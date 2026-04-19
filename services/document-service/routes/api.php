@@ -10,18 +10,8 @@ Route::get('/health', function () {
     ]);
 });
 
-Route::post('/generate', function (\Illuminate\Http\Request $request) {
-    $validated = $request->validate([
-        'form_data' => 'required|array',
-    ]);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Document generation is queued.',
-        'data' => [
-            'format' => 'pdf',
-            'generated_at' => now()->toIso8601String(),
-            'field_count' => count($validated['form_data']),
-        ],
-    ]);
+Route::prefix('documents')->group(function () {
+    Route::post('/generate', [DocumentController::class, 'generate']);
+    Route::get('/{id}', [DocumentController::class, 'show']);
+    Route::get('/{id}/download', [DocumentController::class, 'download']);
 });

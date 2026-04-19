@@ -29,18 +29,40 @@ class DocumentController extends Controller
         ], 202);
     }
 
-    public function show(int $id)
+    public function preview(Request $request, int $id)
     {
+
         $doc = $request->user()
             ->documents()
             ->findOrFail($id);
 
-        return response()->json($doc);
+        if ($doc->status !== 'completed' || !$doc->output_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Document not ready for preview.',
+                'status' => $doc->status,
+            ], 409);
+        }
+
+        if (!Storage::disk('local')->exists($doc->output_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Generated file is missing from storage.',
+            ], 404);
+        }
+
+        // instead of dl, stream pdf inline
+        $absolutePath = Storage::disk('local')->path($doc->output_path);
+        $filename = "SALN-{$doc->user_id}-{$doc->id}.pdf";
+
+        return response()->file($absolutePath, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
     }
 
-    public function download(int $id)
+    public function download(Request $request, int $id)
     {
-        $doc = Document::findOrFail($id);
         $doc = $request->user()
                     ->documents()
                     ->findOrFail($id);
