@@ -13,6 +13,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 
+use mikehaertl\pdftk\Pdf;
+use RuntimeException;
+
 class GeneratePdfJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -36,19 +39,74 @@ class GeneratePdfJob implements ShouldQueue
         ]);
 
         try {
-            // 1) Map your stored form_data into the field/value structure needed by the template
-            $mappedData = $mapper->map($doc->form_data);
+            
+            $fileTempPaths = [];
+            $page_index = 0;
+            $form_data = $doc->form_data; // lazy to change $form->data -> doc->form_data
 
-            // 2) Fill template -> raw PDF bytes
-            $filledBasePath = $filler->fillToFile($doc->template, $mappedData);
+            $overflows = [['real_properties',4],
+                        ['personal_properties',6],
+                        ['business_interests',3],
+                        ['liabilities',4]];
 
-            // 3) Merge (implementation pending)
-            // TODO: $mergedPath = $merger->mergeToFile([$filledBasePath, ...$annexPaths]);
+            foreach ($overflows as [$type, $size])
+            {
+                if (count($form_data[$type]) > $size)
+                {
+                    $page_index = max([$page_index, count($form_data[$type])%$size]);
+                };
+            }
 
-            // 4) Store merged bytes
+            $pages = [
+                'real' => array_chunk($form_data['real_properties'], 4),
+                'personal' => array_chunk($form_data['personal_properties'], 6),
+                'bus' => array_chunk($form_data['business_interests'], 3),
+                'liab' => array_chunk($form_data['liabilities'], 4),
+            ];
+
+
+            for ($i = 0;$i<=$page_index;$i++)
+            {
+                $form_data['real_properties'] = $pages['real'][$i] ?? [];
+                $form_data['personal_properties'] = $pages['personal'][$i] ?? [];
+                $form_data['business_interests'] = $pages['bus'][$i] ?? [];
+                $form_data['liabilities'] = $pages['liab'][$i] ?? [];
+
+                if ($i === 0){
+                    $mappedData = $mapper->mapA($form_data);
+                    $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i);
+                }
+                else{
+                    $mappedData = $mapper->mapB($form_data);
+                    $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i);
+                }
+
+            }
+
+            // merge into final
+            $mergedTmpDir = storage_path("app/tmp");
+            $mergedTmpPath = "{$mergedTmpDir}/SALN-merged.pdf";
+            
+            $pdf = new Pdf($fileTempPaths);
+            $result = $pdf->needAppearances()->saveAs($mergedTmpPath);
+            
+            if ($result === false) {
+                throw new RuntimeException("pdftk merge failed: " . $pdf->getError());
+            }
+            
             $fileName = "generated/SALN-{$doc->user_id}-{$doc->id}.pdf";
-            Storage::disk('local')->put($fileName, file_get_contents($filledBasePath));
+            Storage::disk('local')->put($fileName, file_get_contents($mergedTmpPath));
 
+            // del temps
+            if (is_file($mergedTmpPath) && !unlink($mergedTmpPath)) {
+                throw new \RuntimeException("Failed to delete temp file: {$mergedTmpPath}");
+            }
+
+            foreach ($fileTempPaths as $filepath) {
+                if (is_file($filepath) && !unlink($filepath)) {
+                    throw new \RuntimeException("Failed to delete temp file: {$filepath}");
+                }
+            }
 
             $doc->update([
                 'status' => 'completed',
