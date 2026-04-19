@@ -29,4 +29,10 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    // tie document generated to user
+    public function documents()
+    {
+        return $this->hasMany(Document::class);
+    }
+
 }
