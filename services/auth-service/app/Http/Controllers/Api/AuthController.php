@@ -134,6 +134,7 @@ class AuthController extends Controller
             if ($user->last_activity_at && $user->last_activity_at->lt(now()->subDays(5))) {
                 $inactivityNotice = true;
                 $this->requestFormPurge($user->id);
+                $this->requestDocumentPurge($user->id);
             }
 
             $user->last_activity_at = now();
@@ -197,6 +198,22 @@ class AuthController extends Controller
             ]);
         } catch (\Throwable $e) {
             Log::warning('Could not purge forms after inactivity.', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function requestDocumentPurge(string $userId): void
+    {
+        $documentServiceUrl = rtrim((string) env('DOCUMENT_SERVICE_URL', 'http://127.0.0.1:8003'), '/');
+
+        try {
+            Http::timeout(3)->post("{$documentServiceUrl}/api/documents/purge", [
+                'user_id' => $userId,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Could not purge documents after inactivity.', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
             ]);
