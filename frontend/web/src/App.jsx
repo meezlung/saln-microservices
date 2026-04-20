@@ -602,6 +602,13 @@ function DashboardPage() {
   }, [formData, openSections, loading])
 
   function renderSectionStatus(sectionKey) {
+    // Special case: Certification section requires checkbox to be checked
+    if (sectionKey === 'certification') {
+      if (!formData.certification?.authorization_to_verify) {
+        return <span className="section-status incomplete">1 empty</span>
+      }
+      return <span className="section-status complete">Complete</span>
+    }
     const emptyCount = sectionEmptyCounts[sectionKey] ?? 0
 
     if (emptyCount === 0) {
@@ -1741,19 +1748,6 @@ function DashboardPage() {
             <span className="section-toggle">{openSections.certification ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.certification ? 'active' : ''}`}>
-            <div className="form-group">
-              <label>Date Signed</label>
-              <input
-                type="date"
-                value={formData.certification.date_signed || ''}
-                onChange={(e) =>
-                  updateForm((next) => {
-                    next.certification.date_signed = e.target.value
-                  })
-                }
-              />
-            </div>
-
             <div className="form-group">
               <label>
                 <input
