@@ -16,12 +16,11 @@ class DocumentController extends Controller
             'form_data' => 'required|array',  // values to fill
         ]);
 
-         $doc = $request->user()->documents()->create([
-        'form_data' => $validated['form_data'],
-        'status' => 'queued',
+        $doc = Document::create([
+            'form_data' => $validated['form_data'],
+            'status' => 'queued',
         ]);
-
-        GeneratePdfJob::dispatch($doc->id, $request->user()->id);
+        GeneratePdfJob::dispatch($doc->id);
     
         return response()->json([
             'success' => true,
@@ -32,9 +31,7 @@ class DocumentController extends Controller
 
     public function show(Request $request, int $id)
     {
-        $doc = $request->user()
-            ->documents()
-            ->findOrFail($id);
+        $doc = Document::findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -54,9 +51,7 @@ class DocumentController extends Controller
     public function preview(Request $request, int $id)
     {
 
-        $doc = $request->user()
-            ->documents()
-            ->findOrFail($id);
+        $doc = Document::findOrFail($id);
 
         if ($doc->status !== 'completed' || !$doc->output_path) {
             return response()->json([
@@ -75,7 +70,7 @@ class DocumentController extends Controller
 
         // instead of dl, stream pdf inline
         $absolutePath = Storage::disk('local')->path($doc->output_path);
-        $filename = "SALN-{$doc->user_id}-{$doc->id}.pdf";
+        $filename = "SALN-{$doc->id}.pdf";
 
         return response()->file($absolutePath, [
             'Content-Type' => 'application/pdf',
@@ -106,7 +101,7 @@ class DocumentController extends Controller
 
         return Storage::disk('local')->download(
             $doc->output_path,
-            "SALN-{$doc->user_id}-{$doc->id}.pdf"
+            "SALN-{$doc->id}.pdf"
         );
     }
 

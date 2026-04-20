@@ -20,7 +20,7 @@ class GeneratePdfJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $documentId, public int $userId)
+    public function __construct(public int $documentId)
     {
     }
 
@@ -29,9 +29,7 @@ class GeneratePdfJob implements ShouldQueue
         PdfFormMapper $mapper,
     ): void {
         
-        $doc = Document::whereKey($this->documentId)
-            ->where('user_id', $this->userId)
-            ->firstOrFail();
+        $doc = Document::findOrFail($this->documentId);
 
         $doc->update([
             'status' => 'processing',
@@ -74,11 +72,11 @@ class GeneratePdfJob implements ShouldQueue
 
                 if ($i === 0){
                     $mappedData = $mapper->mapA($form_data);
-                    $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i);
+                    $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i,$doc);
                 }
                 else{
                     $mappedData = $mapper->mapB($form_data);
-                    $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i);
+                    $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i,$doc);
                 }
 
             }
@@ -94,7 +92,7 @@ class GeneratePdfJob implements ShouldQueue
                 throw new RuntimeException("pdftk merge failed: " . $pdf->getError());
             }
             
-            $fileName = "generated/SALN-{$doc->user_id}-{$doc->id}.pdf";
+            $fileName = "generated/SALN-{$doc->id}.pdf";
             Storage::disk('local')->put($fileName, file_get_contents($mergedTmpPath));
 
             // del temps

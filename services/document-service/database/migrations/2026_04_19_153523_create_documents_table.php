@@ -13,8 +13,6 @@ return new class extends Migration
     {
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
-            
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
             $table->json('form_data');
 
@@ -23,9 +21,6 @@ return new class extends Migration
             $table->text('error_message')->nullable();
 
             $table->timestamps();
-
-            // optional index for "my documents" queries
-            $table->index(['user_id', 'created_at']);
         });
     }
 

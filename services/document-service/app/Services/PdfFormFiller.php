@@ -21,7 +21,7 @@ class PdfFormFiller
             mkdir($outDir, 0775, true);
         }
 
-        $outPath = "{$outDir}/SALN-{$doc->user_id}-{$doc->id}-{$index}.pdf";
+        $outPath = "{$outDir}/SALN-{$doc->id}-{$index}.pdf";
 
         $pdf = new Pdf($pdfPath);
 

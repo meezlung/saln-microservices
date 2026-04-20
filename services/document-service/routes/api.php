@@ -11,7 +11,7 @@ Route::get('/health', function () {
     ]);
 });
 
-Route::middleware('auth:sanctum')->prefix('documents')->group(function () {
+Route::prefix('documents')->group(function () {
     Route::post('/generate', [DocumentController::class, 'generate']);
     Route::get('/{id}', [DocumentController::class, 'show']);
     Route::get('/{id}/preview', [DocumentController::class, 'preview']);
