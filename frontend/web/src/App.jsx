@@ -1742,19 +1742,6 @@ function DashboardPage() {
           </div>
           <div className={`section-content ${openSections.certification ? 'active' : ''}`}>
             <div className="form-group">
-              <label>Date Signed</label>
-              <input
-                type="date"
-                value={formData.certification.date_signed || ''}
-                onChange={(e) =>
-                  updateForm((next) => {
-                    next.certification.date_signed = e.target.value
-                  })
-                }
-              />
-            </div>
-
-            <div className="form-group">
               <label>
                 <input
                   type="checkbox"
