@@ -53,7 +53,7 @@ function createEmptyForm() {
         },
       },
     },
-    spouse: null,
+    spouses: [],
     children_below_18: [],
     assets: {
       real_properties: [],
@@ -98,7 +98,11 @@ function normalizeFormData(raw) {
         },
       },
     },
-    spouse: data.spouse ? { ...data.spouse } : null,
+    spouses: Array.isArray(data.spouses)
+      ? data.spouses.map((spouse) => ({ ...spouse }))
+      : data.spouse
+      ? [{ ...data.spouse }]
+      : [],
     children_below_18: Array.isArray(data.children_below_18) ? data.children_below_18 : [],
     assets: {
       ...base.assets,
@@ -826,26 +830,30 @@ function DashboardPage() {
     })
   }
 
-  function setSpouseEnabled(enabled) {
+  function addSpouse() {
     updateForm((next) => {
-      next.spouse = enabled
-        ? {
-            is_public_official: false,
-            last_name: '',
-            first_name: '',
-            middle_initial: '',
-            position: '',
-            agency_office: '',
-            office_address: '',
-          }
-        : null
+      next.spouses.push({
+        is_public_official: false,
+        last_name: '',
+        first_name: '',
+        middle_initial: '',
+        position: '',
+        agency_office: '',
+        office_address: '',
+      })
     })
   }
 
-  function setSpouseField(field, value) {
+  function removeSpouse(index) {
     updateForm((next) => {
-      if (!next.spouse) {
-        next.spouse = {
+      next.spouses.splice(index, 1)
+    })
+  }
+
+  function setSpouseField(index, field, value) {
+    updateForm((next) => {
+      if (!next.spouses[index]) {
+        next.spouses[index] = {
           is_public_official: false,
           last_name: '',
           first_name: '',
@@ -855,8 +863,7 @@ function DashboardPage() {
           office_address: '',
         }
       }
-
-      next.spouse[field] = value
+      next.spouses[index][field] = value
     })
   }
 
@@ -1283,42 +1290,40 @@ function DashboardPage() {
             </div>
             <span className="section-toggle">{openSections.spouse ? '−' : '+'}</span>
           </div>
-          <div className={`section-content ${openSections.spouse ? 'active' : ''}`}>
-            <div className="form-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!formData.spouse}
-                  onChange={(e) => setSpouseEnabled(!e.target.checked)}
-                />{' '}
-                N/A
-              </label>
-            </div>
-            {formData.spouse ? (
-              <>
+          <div className={`section-content ${openSections.spouse ? 'active' : ''}`}> 
+            {formData.spouses.length === 0 ? (
+              <div className="form-group">
+                <label>No spouse added.</label>
+              </div>
+            ) : null}
+            {formData.spouses.map((spouse, idx) => (
+              <div className="repeater-item" key={`spouse-${idx}`}> 
+                <button type="button" className="repeater-remove" onClick={() => removeSpouse(idx)}>
+                  ×
+                </button>
                 <div className="form-row-3">
                   <div className="form-group">
                     <label>Last Name</label>
                     <input
                       type="text"
-                      value={formData.spouse.last_name || ''}
-                      onChange={(e) => setSpouseField('last_name', e.target.value)}
+                      value={spouse.last_name || ''}
+                      onChange={(e) => setSpouseField(idx, 'last_name', e.target.value)}
                     />
                   </div>
                   <div className="form-group">
                     <label>First Name</label>
                     <input
                       type="text"
-                      value={formData.spouse.first_name || ''}
-                      onChange={(e) => setSpouseField('first_name', e.target.value)}
+                      value={spouse.first_name || ''}
+                      onChange={(e) => setSpouseField(idx, 'first_name', e.target.value)}
                     />
                   </div>
                   <div className="form-group">
                     <label>Middle Initial</label>
                     <input
                       type="text"
-                      value={formData.spouse.middle_initial || ''}
-                      onChange={(e) => setSpouseField('middle_initial', e.target.value)}
+                      value={spouse.middle_initial || ''}
+                      onChange={(e) => setSpouseField(idx, 'middle_initial', e.target.value)}
                     />
                   </div>
                 </div>
@@ -1327,8 +1332,8 @@ function DashboardPage() {
                   <label>
                     <input
                       type="checkbox"
-                      checked={!!formData.spouse.is_public_official}
-                      onChange={(e) => setSpouseField('is_public_official', e.target.checked)}
+                      checked={!!spouse.is_public_official}
+                      onChange={(e) => setSpouseField(idx, 'is_public_official', e.target.checked)}
                     />{' '}
                     Is a public official
                   </label>
@@ -1338,8 +1343,8 @@ function DashboardPage() {
                   <label>Position</label>
                   <input
                     type="text"
-                    value={formData.spouse.position || ''}
-                    onChange={(e) => setSpouseField('position', e.target.value)}
+                    value={spouse.position || ''}
+                    onChange={(e) => setSpouseField(idx, 'position', e.target.value)}
                   />
                 </div>
 
@@ -1347,12 +1352,27 @@ function DashboardPage() {
                   <label>Agency/Office</label>
                   <input
                     type="text"
-                    value={formData.spouse.agency_office || ''}
-                    onChange={(e) => setSpouseField('agency_office', e.target.value)}
+                    value={spouse.agency_office || ''}
+                    onChange={(e) => setSpouseField(idx, 'agency_office', e.target.value)}
                   />
                 </div>
-              </>
-            ) : null}
+                <div className="form-group">
+                  <label>Office Address</label>
+                  <input
+                    type="text"
+                    value={spouse.office_address || ''}
+                    onChange={(e) => setSpouseField(idx, 'office_address', e.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn btn-add-item"
+              onClick={addSpouse}
+            >
+              + Add Spouse
+            </button>
           </div>
         </div>
 
