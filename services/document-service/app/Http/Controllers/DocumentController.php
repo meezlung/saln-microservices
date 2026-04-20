@@ -29,7 +29,7 @@ class DocumentController extends Controller
         ], 202);
     }
 
-    public function show(Request $request, int $id)
+    public function show(int $id)
     {
         $doc = Document::findOrFail($id);
 
@@ -48,7 +48,7 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function preview(Request $request, int $id)
+    public function preview(int $id)
     {
 
         $doc = Document::findOrFail($id);
@@ -78,11 +78,9 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function download(Request $request, int $id)
+    public function download(int $id)
     {
-        $doc = $request->user()
-                    ->documents()
-                    ->findOrFail($id);
+        $doc = Document::findOrFail($id);
 
         if ($doc->status !== 'completed' || !$doc->output_path) {
             return response()->json([

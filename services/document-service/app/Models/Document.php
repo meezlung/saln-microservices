@@ -16,10 +16,5 @@ class Document extends Model
     protected $casts = [
         'form_data' => 'array',
     ];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
 }
 
