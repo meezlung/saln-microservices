@@ -111,11 +111,11 @@ class GeneratePdfJob implements ShouldQueue
 
                 if ($i === 0){
                     $mappedData = $mapper->mapA($form_data);
-                    $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i);
+                    $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i,$doc);
                 }
                 else{
                     $mappedData = $mapper->mapB($form_data);
-                    $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i);
+                    $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i,$doc);
                 }
 
             }
