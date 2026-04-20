@@ -13,7 +13,7 @@ Route::get('/health', function () {
 
 Route::prefix('documents')->group(function () {
     Route::post('/generate', [DocumentController::class, 'generate']);
-    Route::get('/{document}', [DocumentController::class, 'show']);
-    Route::get('/{document}/preview', [DocumentController::class, 'preview']);
-    Route::get('/{document}/download', [DocumentController::class, 'download']);
+    Route::get('/{doc}', [DocumentController::class, 'show']);
+    Route::get('/{doc}/preview', [DocumentController::class, 'preview']);
+    Route::get('/{doc}/download', [DocumentController::class, 'download']);
 });
