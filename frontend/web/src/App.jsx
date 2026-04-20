@@ -11,6 +11,9 @@ import {
 } from './lib/api'
 
 const THEME_STORAGE_KEY = 'theme'
+const GOV_ID_NUMBER_REGEX = /^\d*$/
+const WHOLE_NUMBER_REGEX = /^\d*$/
+const DECIMAL_NUMBER_REGEX = /^\d*(\.\d{0,2})?$/
 
 function getInitialTheme() {
   const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
@@ -435,6 +438,8 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [sectionEmptyCounts, setSectionEmptyCounts] = useState({})
+  const [govIdNumberError, setGovIdNumberError] = useState('')
+  const [numericFieldErrors, setNumericFieldErrors] = useState({})
 
   const formDataRef = useRef(formData)
   const dirtyRef = useRef(isDirty)
@@ -642,8 +647,110 @@ function DashboardPage() {
   }
 
   function setGovIdField(field, value) {
+    if (field === 'id_number') {
+      if (!GOV_ID_NUMBER_REGEX.test(value)) {
+        setGovIdNumberError('ID Number must contain digits only.')
+        return
+      }
+
+      setGovIdNumberError('')
+    }
+
     updateForm((next) => {
       next.declarant.personal_information.government_id[field] = value
+    })
+  }
+
+  function setNumericFieldError(key, message) {
+    setNumericFieldErrors((prev) => {
+      if (!message) {
+        if (!prev[key]) {
+          return prev
+        }
+
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+
+      return {
+        ...prev,
+        [key]: message,
+      }
+    })
+  }
+
+  function setChildAgeField(index, value) {
+    const errorKey = `children_below_18.${index}.age`
+
+    if (!WHOLE_NUMBER_REGEX.test(value)) {
+      setNumericFieldError(errorKey, 'Age must contain digits only.')
+      return
+    }
+
+    if (value !== '' && Number(value) >= 18) {
+      setNumericFieldError(errorKey, 'Age must be below 18.')
+
+      updateForm((next) => {
+        next.children_below_18[index].age = ''
+      })
+      return
+    }
+
+    setNumericFieldError(errorKey, '')
+
+    updateForm((next) => {
+      next.children_below_18[index].age = value
+    })
+  }
+
+  function setRealPropertyValueField(index, field, value) {
+    const errorKey = `assets.real_properties.${index}.${field}`
+
+    if (!DECIMAL_NUMBER_REGEX.test(value)) {
+      setNumericFieldError(errorKey, 'Enter numbers only (up to 2 decimal places).')
+      return
+    }
+
+    setNumericFieldError(errorKey, '')
+
+    updateForm((next) => {
+      if (field === 'acquisition.cost') {
+        next.assets.real_properties[index].acquisition.cost = value
+        return
+      }
+
+      next.assets.real_properties[index][field] = value
+    })
+  }
+
+  function setPersonalPropertyCostField(index, value) {
+    const errorKey = `assets.personal_properties.${index}.acquisition_cost`
+
+    if (!DECIMAL_NUMBER_REGEX.test(value)) {
+      setNumericFieldError(errorKey, 'Enter numbers only (up to 2 decimal places).')
+      return
+    }
+
+    setNumericFieldError(errorKey, '')
+
+    updateForm((next) => {
+      next.assets.personal_properties[index].acquisition_cost = value
+    })
+  }
+
+  function setLiabilityBalanceField(index, value) {
+    const errorKey = `liabilities.${index}.outstanding_balance`
+
+    if (!DECIMAL_NUMBER_REGEX.test(value)) {
+      setNumericFieldError(errorKey, 'Enter numbers only (up to 2 decimal places).')
+      return
+    }
+
+    setNumericFieldError(errorKey, '')
+
+    updateForm((next) => {
+      next.liabilities[index].outstanding_balance = value
     })
   }
 
@@ -1079,7 +1186,10 @@ function DashboardPage() {
                   type="text"
                   value={formData.declarant?.personal_information?.government_id?.id_number || ''}
                   onChange={(e) => setGovIdField('id_number', e.target.value)}
+                  inputMode="numeric"
+                  aria-invalid={!!govIdNumberError}
                 />
+                {govIdNumberError ? <p className="error">{govIdNumberError}</p> : null}
               </div>
             </div>
             <div className="form-group">
@@ -1204,16 +1314,15 @@ function DashboardPage() {
                   <div className="form-group">
                     <label>Age</label>
                     <input
-                      type="number"
-                      min={0}
-                      max={17}
+                      type="text"
+                      inputMode="numeric"
                       value={child.age || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.children_below_18[index].age = e.target.value
-                        })
-                      }
+                      onChange={(e) => setChildAgeField(index, e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`children_below_18.${index}.age`]}
                     />
+                    {numericFieldErrors[`children_below_18.${index}.age`] ? (
+                      <p className="error">{numericFieldErrors[`children_below_18.${index}.age`]}</p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -1296,30 +1405,28 @@ function DashboardPage() {
                   <div className="form-group">
                     <label>Assessed Value (PHP)</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={item.assessed_value || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.real_properties[index].assessed_value = e.target.value
-                        })
-                      }
+                      onChange={(e) => setRealPropertyValueField(index, 'assessed_value', e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.real_properties.${index}.assessed_value`]}
                     />
+                    {numericFieldErrors[`assets.real_properties.${index}.assessed_value`] ? (
+                      <p className="error">{numericFieldErrors[`assets.real_properties.${index}.assessed_value`]}</p>
+                    ) : null}
                   </div>
                   <div className="form-group">
                     <label>Fair Market Value (PHP)</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={item.fair_market_value || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.real_properties[index].fair_market_value = e.target.value
-                        })
-                      }
+                      onChange={(e) => setRealPropertyValueField(index, 'fair_market_value', e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.real_properties.${index}.fair_market_value`]}
                     />
+                    {numericFieldErrors[`assets.real_properties.${index}.fair_market_value`] ? (
+                      <p className="error">{numericFieldErrors[`assets.real_properties.${index}.fair_market_value`]}</p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1359,16 +1466,15 @@ function DashboardPage() {
                   <div className="form-group">
                     <label>Cost (PHP)</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={item.acquisition?.cost || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.real_properties[index].acquisition.cost = e.target.value
-                        })
-                      }
+                      onChange={(e) => setRealPropertyValueField(index, 'acquisition.cost', e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.real_properties.${index}.acquisition.cost`]}
                     />
+                    {numericFieldErrors[`assets.real_properties.${index}.acquisition.cost`] ? (
+                      <p className="error">{numericFieldErrors[`assets.real_properties.${index}.acquisition.cost`]}</p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -1440,16 +1546,15 @@ function DashboardPage() {
                   <div className="form-group">
                     <label>Acquisition Cost (PHP)</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={item.acquisition_cost || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.personal_properties[index].acquisition_cost = e.target.value
-                        })
-                      }
+                      onChange={(e) => setPersonalPropertyCostField(index, e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.personal_properties.${index}.acquisition_cost`]}
                     />
+                    {numericFieldErrors[`assets.personal_properties.${index}.acquisition_cost`] ? (
+                      <p className="error">{numericFieldErrors[`assets.personal_properties.${index}.acquisition_cost`]}</p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -1515,16 +1620,15 @@ function DashboardPage() {
                   <div className="form-group">
                     <label>Outstanding Balance (PHP)</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={item.outstanding_balance || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.liabilities[index].outstanding_balance = e.target.value
-                        })
-                      }
+                      onChange={(e) => setLiabilityBalanceField(index, e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`liabilities.${index}.outstanding_balance`]}
                     />
+                    {numericFieldErrors[`liabilities.${index}.outstanding_balance`] ? (
+                      <p className="error">{numericFieldErrors[`liabilities.${index}.outstanding_balance`]}</p>
+                    ) : null}
                   </div>
                 </div>
               </div>
