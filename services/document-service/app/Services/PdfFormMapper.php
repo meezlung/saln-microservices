@@ -72,7 +72,7 @@ final class PdfFormMapper
         $pdf = [
             // form metadata (ie just the top part)
             "assumption_of_office"           => $form['assumption_date'],   
-            "annual_filing"                  => $form['annual_year'],
+            "annual_filing"                  => (new DateTime('last year'))->format('Y'),
             "exit"                           => $form['exit_date'],
 
             // checkboxes
@@ -236,6 +236,7 @@ final class PdfFormMapper
             'family_name_2'               => $declarant['middle_initial'],
             'position'         => $declarant['position'],
             'agency_office'    => $declarant['agency_office'],
+            'as_of'            => new DateTime('last year december 31')->format('F j, Y'),
 
         ];
 
