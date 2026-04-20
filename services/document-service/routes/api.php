@@ -16,4 +16,5 @@ Route::prefix('documents')->group(function () {
     Route::get('/{doc}', [DocumentController::class, 'show']);
     Route::get('/{doc}/preview', [DocumentController::class, 'preview']);
     Route::get('/{doc}/download', [DocumentController::class, 'download']);
+    Route::post('/purge', [DocumentController::class, 'purge']);
 });

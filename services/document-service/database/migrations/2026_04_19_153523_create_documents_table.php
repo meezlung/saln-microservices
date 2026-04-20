@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
             $table->string('public_id', 26)->unique(); // ULID
+            $table->uuid('owner_user_id')->index(); // auth-service user UUID
             $table->json('form_data');
             $table->string('status')->default('queued');
             $table->string('output_path')->nullable();

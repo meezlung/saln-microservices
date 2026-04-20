@@ -13,6 +13,7 @@ class Document extends Model
         'output_path',
         'error_message',
         'public_id',
+        'user_id',
     ];
 
     protected $casts = [

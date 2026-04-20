@@ -6,31 +6,73 @@ use App\Jobs\GeneratePdfJob;
 use App\Models\Document;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class DocumentController extends Controller
 {
+    private function resolveUserId(Request $request): ?string
+    {
+        $userId = $request->header('X-User-Id')
+            ?? $request->query('user_id')
+            ?? $request->input('user_id');
+
+        if (!is_string($userId) || !Str::isUuid($userId)) {
+            return null;
+        }
+
+        return $userId;
+    }
+
+    private function forbidIfNotOwner(Request $request, Document $doc)
+    {
+        $userId = $this->resolveUserId($request);
+
+        if (!$userId || $doc->owner_user_id !== $userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
+        return null;
+    }
+
     public function generate(Request $request)
     {
         $validated = $request->validate([
             'form_data' => 'required|array',
         ]);
 
+        $userId = $this->resolveUserId($request);
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing or invalid user ID.',
+            ], 422);
+        }
+
         $doc = Document::create([
+            'owner_user_id' => $userId,
             'form_data' => $validated['form_data'],
             'status' => 'queued',
         ]);
 
-        GeneratePdfJob::dispatch($doc->id); // keep internal numeric id for the job if you want
+        GeneratePdfJob::dispatch($doc->id);
 
         return response()->json([
             'success' => true,
-            'document_id' => $doc->public_id, // expose public id
+            'document_id' => $doc->public_id,
             'status' => $doc->status,
         ], 202);
     }
 
-    public function show(Document $doc)
+    public function show(Request $request, Document $doc)
     {
+        // if ($resp = $this->forbidIfNotOwner($request, $doc)) {
+        //     return $resp;
+        // }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -44,8 +86,12 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function preview(Document $doc)
+    public function preview(Request $request, Document $doc)
     {
+        // if ($resp = $this->forbidIfNotOwner($request, $doc)) {
+        //     return $resp;
+        // }
+
         if ($doc->status !== 'completed' || !$doc->output_path) {
             return response()->json([
                 'success' => false,
@@ -70,8 +116,12 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function download(Document $doc)
+    public function download(Request $request, Document $doc)
     {
+        // if ($resp = $this->forbidIfNotOwner($request, $doc)) {
+        //     return $resp;
+        // }
+
         if ($doc->status !== 'completed' || !$doc->output_path) {
             return response()->json([
                 'success' => false,
@@ -91,5 +141,32 @@ class DocumentController extends Controller
             $doc->output_path,
             "SALN-{$doc->public_id}.pdf"
         );
+    }
+
+    public function purge(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|uuid',
+        ]);
+
+        $userId = $validated['user_id'];
+
+        // get documents first so we can delete their files
+        $docs = Document::where('owner_user_id', $userId)->get();
+
+        foreach ($docs as $doc) {
+            if ($doc->output_path && Storage::disk('local')->exists($doc->output_path)) {
+                Storage::disk('local')->delete($doc->output_path);
+            }
+        }
+
+        // del DB rows (after file cleanup)
+        Document::where('owner_user_id', $userId)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User document data purged.',
+            'deleted_documents' => $docs->count(),
+        ]);
     }
 }
