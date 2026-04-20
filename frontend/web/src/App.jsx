@@ -452,6 +452,38 @@ function DashboardPage() {
     dirtyRef.current = isDirty
   }, [isDirty])
 
+  useEffect(() => {
+    setNumericFieldErrors((prev) => {
+      const next = { ...prev }
+
+      Object.keys(next).forEach((key) => {
+        if (key.startsWith('children_below_18.') && key.endsWith('.age')) {
+          delete next[key]
+        }
+      })
+
+      formData.children_below_18.forEach((child, index) => {
+        const value = String(child?.age ?? '')
+        if (value === '') {
+          return
+        }
+
+        const errorKey = `children_below_18.${index}.age`
+
+        if (!WHOLE_NUMBER_REGEX.test(value)) {
+          next[errorKey] = 'Age must contain digits only.'
+          return
+        }
+
+        if (Number(value) >= 18) {
+          next[errorKey] = 'Age must be below 18.'
+        }
+      })
+
+      return next
+    })
+  }, [formData.children_below_18])
+
   const realTotal = formData.assets.real_properties.reduce(
     (sum, item) => sum + Number(item.fair_market_value || 0),
     0,
@@ -578,7 +610,8 @@ function DashboardPage() {
 
       fields.forEach((field) => {
         const value = typeof field.value === 'string' ? field.value.trim() : ''
-        field.classList.toggle('field-empty', value === '')
+        const hasValidationError = field.getAttribute('aria-invalid') === 'true'
+        field.classList.toggle('field-empty', value === '' || hasValidationError)
       })
 
       const nextCounts = {}
