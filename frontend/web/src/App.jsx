@@ -855,6 +855,24 @@ function DashboardPage() {
     )
   }
 
+  // Section summaries
+  const realPropertiesFairMarketTotal = formData.assets.real_properties.reduce(
+    (sum, item) => sum + Number(item.fair_market_value || 0),
+    0,
+  )
+  const realPropertiesAssessedTotal = formData.assets.real_properties.reduce(
+    (sum, item) => sum + Number(item.assessed_value || 0),
+    0,
+  )
+  const personalPropertiesTotal = formData.assets.personal_properties.reduce(
+    (sum, item) => sum + Number(item.acquisition_cost || 0),
+    0,
+  )
+  const liabilitiesOutstandingTotal = formData.liabilities.reduce(
+    (sum, item) => sum + Number(item.outstanding_balance || 0),
+    0,
+  )
+
   return (
     <>
       {showInactivityModal ? (
@@ -1205,8 +1223,11 @@ function DashboardPage() {
 
         <div className="form-section" data-section="realProperties">
           <div className="section-header" onClick={() => toggleSection('realProperties')}>
-            <div className="section-header-main">
-              <h3>Real Properties</h3>
+            <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0 }}>Real Properties</h3>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>
+                Total Assessed: PHP {formatCurrency(realPropertiesAssessedTotal)} | Total FMV: PHP {formatCurrency(realPropertiesFairMarketTotal)}
+              </span>
               {renderSectionStatus('realProperties')}
             </div>
             <span className="section-toggle">{openSections.realProperties ? '−' : '+'}</span>
@@ -1367,8 +1388,9 @@ function DashboardPage() {
 
         <div className="form-section" data-section="personalProperties">
           <div className="section-header" onClick={() => toggleSection('personalProperties')}>
-            <div className="section-header-main">
-              <h3>Personal Properties</h3>
+            <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0 }}>Personal Properties</h3>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>Total: PHP {formatCurrency(personalPropertiesTotal)}</span>
               {renderSectionStatus('personalProperties')}
             </div>
             <span className="section-toggle">{openSections.personalProperties ? '−' : '+'}</span>
@@ -1444,8 +1466,9 @@ function DashboardPage() {
 
         <div className="form-section" data-section="liabilities">
           <div className="section-header" onClick={() => toggleSection('liabilities')}>
-            <div className="section-header-main">
-              <h3>Liabilities</h3>
+            <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0 }}>Liabilities</h3>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>Total: PHP {formatCurrency(liabilitiesOutstandingTotal)}</span>
               {renderSectionStatus('liabilities')}
             </div>
             <span className="section-toggle">{openSections.liabilities ? '−' : '+'}</span>
