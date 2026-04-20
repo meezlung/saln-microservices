@@ -68,8 +68,8 @@ final class PdfFormMapper
         
         $liabilities = $form['liabilities'] ?? [];
 
-        [$decAddr1, $decAddr2] = self::addressLines($declarant['office_address']);
-        [$spAddr1, $spAddr2]   = self::addressLines($spouse['office_address']);
+        [$decAddr1, $decAddr2] = self::addressLines($declarant['office_address'] ?? '');
+        [$spAddr1, $spAddr2]   = self::addressLines($spouse['office_address']?? '');
 
         $filingType = $form['form_metadata']['filing_type'] ?? $form['filing_type'] ?? '';
 
