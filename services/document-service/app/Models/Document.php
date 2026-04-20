@@ -14,6 +14,7 @@ class Document extends Model
         'error_message',
         'public_id',
         'user_id',
+        'owner_user_id',
     ];
 
     protected $casts = [
