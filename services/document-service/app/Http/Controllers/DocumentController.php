@@ -1,10 +1,9 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Jobs\GeneratePdfJob;
-
 use App\Models\Document;
-
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,46 +12,40 @@ class DocumentController extends Controller
     public function generate(Request $request)
     {
         $validated = $request->validate([
-            'form_data' => 'required|array',  // values to fill
+            'form_data' => 'required|array',
         ]);
 
         $doc = Document::create([
             'form_data' => $validated['form_data'],
             'status' => 'queued',
         ]);
-        GeneratePdfJob::dispatch($doc->id);
-    
+
+        GeneratePdfJob::dispatch($doc->id); // keep internal numeric id for the job if you want
+
         return response()->json([
             'success' => true,
-            'document_id' => $doc->id,
+            'document_id' => $doc->public_id, // expose public id
             'status' => $doc->status,
         ], 202);
     }
 
-    public function show(int $id)
+    public function show(Document $doc)
     {
-        $doc = Document::findOrFail($id);
-
         return response()->json([
             'success' => true,
             'data' => [
-                'id' => $doc->id,
+                'id' => $doc->public_id,
                 'status' => $doc->status,
                 'created_at' => $doc->created_at,
                 'updated_at' => $doc->updated_at,
-
-                // optional urls for the frontend
-                'preview_url' => url("/api/documents/{$doc->id}/preview"),
-                'download_url' => url("/api/documents/{$doc->id}/download"),
+                'preview_url' => url("/api/documents/{$doc->public_id}/preview"),
+                'download_url' => url("/api/documents/{$doc->public_id}/download"),
             ],
         ]);
     }
 
-    public function preview(int $id)
+    public function preview(Document $doc)
     {
-
-        $doc = Document::findOrFail($id);
-
         if ($doc->status !== 'completed' || !$doc->output_path) {
             return response()->json([
                 'success' => false,
@@ -68,9 +61,8 @@ class DocumentController extends Controller
             ], 404);
         }
 
-        // instead of dl, stream pdf inline
         $absolutePath = Storage::disk('local')->path($doc->output_path);
-        $filename = "SALN-{$doc->id}.pdf";
+        $filename = "SALN-{$doc->public_id}.pdf";
 
         return response()->file($absolutePath, [
             'Content-Type' => 'application/pdf',
@@ -78,10 +70,8 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function download(int $id)
+    public function download(Document $doc)
     {
-        $doc = Document::findOrFail($id);
-
         if ($doc->status !== 'completed' || !$doc->output_path) {
             return response()->json([
                 'success' => false,
@@ -99,8 +89,7 @@ class DocumentController extends Controller
 
         return Storage::disk('local')->download(
             $doc->output_path,
-            "SALN-{$doc->id}.pdf"
+            "SALN-{$doc->public_id}.pdf"
         );
     }
-
 }

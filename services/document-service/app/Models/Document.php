@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Document extends Model
 {
@@ -11,10 +12,23 @@ class Document extends Model
         'status',
         'output_path',
         'error_message',
+        'public_id',
     ];
 
     protected $casts = [
         'form_data' => 'array',
     ];
-}
 
+    protected static function booted()
+    {
+        static::creating(function (Document $doc) {
+            $doc->public_id ??= (string) Str::ulid(); // or Str::uuid()
+        });
+    }
+
+    // route model binding will use public_id instead of id
+    public function getRouteKeyName()
+    {
+        return 'public_id';
+    }
+}

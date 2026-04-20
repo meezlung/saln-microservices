@@ -92,7 +92,7 @@ class GeneratePdfJob implements ShouldQueue
                 throw new RuntimeException("pdftk merge failed: " . $pdf->getError());
             }
             
-            $fileName = "generated/SALN-{$doc->id}.pdf";
+            $fileName = "generated/SALN-{$doc->public_id}.pdf";
             Storage::disk('local')->put($fileName, file_get_contents($mergedTmpPath));
 
             // del temps
