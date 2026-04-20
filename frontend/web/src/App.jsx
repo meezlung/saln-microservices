@@ -457,7 +457,12 @@ function DashboardPage() {
       const next = { ...prev }
 
       Object.keys(next).forEach((key) => {
-        if (key.startsWith('children_below_18.') && key.endsWith('.age')) {
+        if (
+          (key.startsWith('children_below_18.') && key.endsWith('.age')) ||
+          key.includes('assets.real_properties.') ||
+          key.includes('assets.personal_properties.') ||
+          key.includes('liabilities.')
+        ) {
           delete next[key]
         }
       })
@@ -480,9 +485,45 @@ function DashboardPage() {
         }
       })
 
+      formData.assets.real_properties.forEach((item, index) => {
+        const assessedValue = String(item?.assessed_value ?? '')
+        if (assessedValue !== '' && !DECIMAL_NUMBER_REGEX.test(assessedValue)) {
+          next[`assets.real_properties.${index}.assessed_value`] = 'Enter numbers only (up to 2 decimal places).'
+        }
+
+        const fairMarketValue = String(item?.fair_market_value ?? '')
+        if (fairMarketValue !== '' && !DECIMAL_NUMBER_REGEX.test(fairMarketValue)) {
+          next[`assets.real_properties.${index}.fair_market_value`] = 'Enter numbers only (up to 2 decimal places).'
+        }
+
+        const acquisitionCost = String(item?.acquisition?.cost ?? '')
+        if (acquisitionCost !== '' && !DECIMAL_NUMBER_REGEX.test(acquisitionCost)) {
+          next[`assets.real_properties.${index}.acquisition.cost`] = 'Enter numbers only (up to 2 decimal places).'
+        }
+      })
+
+      formData.assets.personal_properties.forEach((item, index) => {
+        const acquisitionCost = String(item?.acquisition_cost ?? '')
+        if (acquisitionCost !== '' && !DECIMAL_NUMBER_REGEX.test(acquisitionCost)) {
+          next[`assets.personal_properties.${index}.acquisition_cost`] = 'Enter numbers only (up to 2 decimal places).'
+        }
+      })
+
+      formData.liabilities.forEach((item, index) => {
+        const outstandingBalance = String(item?.outstanding_balance ?? '')
+        if (outstandingBalance !== '' && !DECIMAL_NUMBER_REGEX.test(outstandingBalance)) {
+          next[`liabilities.${index}.outstanding_balance`] = 'Enter numbers only (up to 2 decimal places).'
+        }
+      })
+
       return next
     })
-  }, [formData.children_below_18])
+  }, [
+    formData.children_below_18,
+    formData.assets.real_properties,
+    formData.assets.personal_properties,
+    formData.liabilities,
+  ])
 
   const realTotal = formData.assets.real_properties.reduce(
     (sum, item) => sum + Number(item.fair_market_value || 0),
