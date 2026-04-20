@@ -37,8 +37,6 @@ function createEmptyForm() {
       compliance_type: 'ASSUMPTION',
       as_of_date: defaultAsOfDate,
       filing_type: 'JOINT',
-      csc_resolution_no: '',
-      promulgated_on: '',
     },
     declarant: {
       personal_information: {
