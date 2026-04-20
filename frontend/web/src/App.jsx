@@ -14,6 +14,8 @@ const THEME_STORAGE_KEY = 'theme'
 const GOV_ID_NUMBER_REGEX = /^\d*$/
 const WHOLE_NUMBER_REGEX = /^\d*$/
 const DECIMAL_NUMBER_REGEX = /^\d*(\.\d{0,2})?$/
+const PDF_POLL_INTERVAL_MS = 2000
+const PDF_POLL_MAX_ATTEMPTS = 30
 
 function getInitialTheme() {
   const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
@@ -133,6 +135,12 @@ function formatCurrency(value) {
   return number.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  })
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
   })
 }
 
@@ -437,6 +445,10 @@ function DashboardPage() {
   const [noticeType, setNoticeType] = useState('info')
   const [notice, setNotice] = useState('')
   const [showInactivityModal, setShowInactivityModal] = useState(false)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [downloadUrl, setDownloadUrl] = useState('')
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [sectionEmptyCounts, setSectionEmptyCounts] = useState({})
@@ -1014,14 +1026,67 @@ function DashboardPage() {
   }
 
   async function handleGeneratePdf() {
+    setIsGeneratingPdf(true)
+    setNoticeType('info')
+    setNotice('Generating PDF. Please wait...')
+
     try {
-      await documentApi.generate(formData)
-      setNoticeType('success')
-      setNotice('Document generation request sent.')
-    } catch {
+      const response = await documentApi.generate(formData)
+      const documentId = response?.data?.document_id
+
+      if (!documentId) {
+        throw new Error('Document ID was not returned by the service.')
+      }
+
+      let documentStatus = ''
+
+      for (let attempt = 0; attempt < PDF_POLL_MAX_ATTEMPTS; attempt += 1) {
+        const statusResponse = await documentApi.show(documentId)
+        const payload = statusResponse?.data?.data
+        documentStatus = payload?.status || ''
+
+        if (documentStatus === 'completed') {
+          setPreviewUrl(`/api/documents/${documentId}/preview`)
+          setDownloadUrl(`/api/documents/${documentId}/download`)
+          setShowPreviewModal(true)
+          setNoticeType('success')
+          setNotice('PDF generated. Preview is ready.')
+          return
+        }
+
+        if (documentStatus === 'failed') {
+          throw new Error('PDF generation failed.')
+        }
+
+        if (attempt < PDF_POLL_MAX_ATTEMPTS - 1) {
+          await sleep(PDF_POLL_INTERVAL_MS)
+        }
+      }
+
+      throw new Error('PDF generation timed out. Please try again in a moment.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send document generation request.'
       setNoticeType('error')
-      setNotice('Failed to send document generation request.')
+      setNotice(message)
+    } finally {
+      setIsGeneratingPdf(false)
     }
+  }
+
+  function handleClosePreviewModal() {
+    setShowPreviewModal(false)
+  }
+
+  function handleDownloadPdf() {
+    if (!downloadUrl) {
+      return
+    }
+
+    const anchor = document.createElement('a')
+    anchor.href = downloadUrl
+    anchor.target = '_blank'
+    anchor.rel = 'noopener noreferrer'
+    anchor.click()
   }
 
   function toggleSection(key) {
@@ -1088,6 +1153,35 @@ function DashboardPage() {
         </div>
       ) : null}
 
+      {showPreviewModal ? (
+        <div className="modal active">
+          <div className="modal-content preview-modal-content">
+            <div className="modal-header preview-modal-header">
+              <h3 style={{ margin: 0 }}>PDF Preview</h3>
+              <button
+                type="button"
+                aria-label="Close preview"
+                className="preview-close-btn"
+                onClick={handleClosePreviewModal}
+              >
+                X
+              </button>
+            </div>
+            <div className="modal-body preview-modal-body">
+              <iframe title="Generated PDF Preview" src={previewUrl} className="preview-iframe" />
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-success" onClick={handleDownloadPdf}>
+                Download PDF
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={handleClosePreviewModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <header style={{ backgroundColor: 'var(--bg-white)', borderBottom: '1px solid var(--border-color)', padding: '12px 0' }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0 }}>SALN Filing System</h3>
@@ -1115,7 +1209,9 @@ function DashboardPage() {
               />
               <button type="button" className="btn btn-secondary" onClick={handleExport}>Export JSON</button>
               <button type="button" className="btn btn-success" onClick={handleSave}>Save</button>
-              <button type="button" className="btn btn-primary" onClick={handleGeneratePdf}>Generate PDF</button>
+              <button type="button" className="btn btn-primary" onClick={handleGeneratePdf} disabled={isGeneratingPdf}>
+                {isGeneratingPdf ? 'Generating PDF...' : 'Generate PDF'}
+              </button>
             </div>
             <div className="navbar-right">
               <span className={`status-indicator ${statusSaved ? 'saved-indicator' : ''}`}>{statusText}</span>

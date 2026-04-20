@@ -96,4 +96,5 @@ export const formApi = {
 
 export const documentApi = {
   generate: (formData) => documentClient.post('/generate', { form_data: formData }),
+  show: (documentId) => documentClient.get(`/${documentId}`),
 }
