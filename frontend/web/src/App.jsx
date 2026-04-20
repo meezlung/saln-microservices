@@ -23,13 +23,17 @@ function getInitialTheme() {
 }
 
 function createEmptyForm() {
+  // Set default values for new forms
+  const now = new Date()
+  const lastYear = now.getFullYear() - 1
+  const defaultAsOfDate = `${lastYear}-12-31`
   return {
     schema_version: '1.0.0',
     form_metadata: {
       form_type: 'SALN_2025',
-      compliance_type: '',
-      as_of_date: '',
-      filing_type: '',
+      compliance_type: 'ASSUMPTION',
+      as_of_date: defaultAsOfDate,
+      filing_type: 'JOINT',
       csc_resolution_no: '',
       promulgated_on: '',
     },
@@ -475,13 +479,38 @@ function DashboardPage() {
       .latest()
       .then((response) => {
         const payload = response?.data?.data?.form_data
+        let nextForm = createEmptyForm()
         if (payload && typeof payload === 'object') {
-          setFormData(normalizeFormData(payload))
+          nextForm = normalizeFormData(payload)
         }
 
+        // Set defaults if fields are empty
+        const now = new Date()
+        const lastYear = now.getFullYear() - 1
+        const defaultAsOfDate = `${lastYear}-12-31`
+        if (!nextForm.form_metadata.compliance_type) {
+          nextForm.form_metadata.compliance_type = 'ASSUMPTION'
+        }
+        if (!nextForm.form_metadata.filing_type) {
+          nextForm.form_metadata.filing_type = 'JOINT'
+        }
+        if (!nextForm.form_metadata.as_of_date) {
+          nextForm.form_metadata.as_of_date = defaultAsOfDate
+        }
+
+        setFormData(nextForm)
         setShowInactivityModal(!!location.state?.inactivityNotice)
       })
       .catch(() => {
+        // If no draft, set defaults for new form
+        const now = new Date()
+        const lastYear = now.getFullYear() - 1
+        const defaultAsOfDate = `${lastYear}-12-31`
+        const nextForm = createEmptyForm()
+        nextForm.form_metadata.compliance_type = 'ASSUMPTION'
+        nextForm.form_metadata.filing_type = 'JOINT'
+        nextForm.form_metadata.as_of_date = defaultAsOfDate
+        setFormData(nextForm)
         setNoticeType('info')
         setNotice('No saved draft found yet.')
       })
@@ -726,7 +755,15 @@ function DashboardPage() {
   async function handleNewEntry() {
     try {
       await formApi.newEntry()
-      setFormData(createEmptyForm())
+      // Set default values for new entry
+      const now = new Date()
+      const lastYear = now.getFullYear() - 1
+      const defaultAsOfDate = `${lastYear}-12-31`
+      const nextForm = createEmptyForm()
+      nextForm.form_metadata.compliance_type = 'ASSUMPTION'
+      nextForm.form_metadata.filing_type = 'JOINT'
+      nextForm.form_metadata.as_of_date = defaultAsOfDate
+      setFormData(nextForm)
       setStatusSaved(false)
       setStatusText('Draft')
       setIsDirty(false)
@@ -921,7 +958,6 @@ function DashboardPage() {
                 />
               </div>
             </div>
-
             <div className="form-row">
               <div className="form-group">
                 <label>Filing Type</label>
@@ -934,25 +970,6 @@ function DashboardPage() {
                   <option value="SEPARATE">Separate</option>
                   <option value="NOT_APPLICABLE">Not Applicable</option>
                 </select>
-              </div>
-              <div className="form-group">
-                <label>CSC Resolution No.</label>
-                <input
-                  type="text"
-                  value={formData.form_metadata?.csc_resolution_no || ''}
-                  onChange={(e) => setMetaField('csc_resolution_no', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Promulgated On</label>
-                <input
-                  type="date"
-                  value={formData.form_metadata?.promulgated_on || ''}
-                  onChange={(e) => setMetaField('promulgated_on', e.target.value)}
-                />
               </div>
             </div>
           </div>
