@@ -81,7 +81,8 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to send verification email. For now, Resend SMTP can only send to gabrielmislang101@gmail.com since mail.saln1.upcsweb.dev.',
+                'message' => 'Unable to send verification email.',
+                'error' => $e->getMessage(),
             ], 500);
         }
 
