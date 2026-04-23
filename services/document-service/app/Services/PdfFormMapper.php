@@ -75,7 +75,7 @@ final class PdfFormMapper
 
         $pdf = [
             // form metadata (ie just the top part)
-            "assumption_of_office"           => $form['assumption_date'] ?? '',   
+            "assumption_of_office"           => $form['assumption_date'] ?? $form['as_of_date'] ?? '',   
             "annual_filing"                  => (new DateTime('last year'))->format('Y'),
             "exit"                           => $form['exit_date'] ?? '',
 
