@@ -54,8 +54,8 @@ final class PdfFormMapper
     public static function mapA(array $form): array
     {   
         $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
-        $spouse = $form['spouse']['personal_information'] ?? $form['spouse'] ?? [];
-        $additional_spouses = $form['additional_spouses'] ?? [];
+        $spouse = $form['spouses'][0] ?? $form['spouse'] ?? [];
+        $additional_spouses =  $form['additional_spouses'] ?? array_slice($form['spouses'] ?? [], 1) ?? [];
         $children = $form['children_below_18'] ?? $form['children'] ?? [];
         $real_properties = $form['assets']['real_properties'] ?? $form['real_properties'] ?? [];
         $personal_properties = $form['assets']['personal_properties'] ?? $form['personal_properties'] ?? [];
@@ -111,14 +111,37 @@ final class PdfFormMapper
 
         // mult spouses
         // TODO more than 2 spouses (annex a?)
+        $count_govt_spouses = 0;
         for ($i =0;$i<2;$i++) {
             $row = $additional_spouses[$i] ?? [];
 
             if ($row === []){
                 break;
             }
+
+            if ($row['is_public_official'] === true){
+                $count_govt_spouses++;
+            }
+
             $r = $i +1;
-            $pdf["mult_spouse_r{$r}"] = $row['name'] ?? '';
+            $temp_name = null;
+            if ($row['last_name'] !== null){
+                $temp_name = ($row['first_name'] ?? '') . " " . ($row['middle_initial'] ?? '') . " " . ($row['last_name'] ?? '');
+            }
+            
+            $pdf["mult_spouse_r{$r}"] = $row['name'] ?? $temp_name ?? '';
+        }
+
+        // account for first spouse
+        if ($spouse['is_public_official'] === true){
+            $count_govt_spouses++;
+        }
+
+        // force sep filing if > 1 spouse is in govt
+        if ($count_govt_spouses > 1){
+            $pdf['joint_filing_check_box'] = self::checkbox(false);
+            $pdf['filing_not_applicable_check_box'] = self::checkbox(false);
+            $pdf['sep_filing_check_box'] = self::checkbox(true);
         }
 
         //children
