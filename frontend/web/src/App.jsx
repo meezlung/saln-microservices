@@ -310,7 +310,8 @@ function LoginPage() {
       setStep(2)
     } catch (err) {
       const message = err?.response?.data?.message || 'Failed to send verification code.'
-      setError(message)
+      const errorDetail = err?.response?.data?.error
+      setError(errorDetail ? `${message} (${errorDetail})` : message)
     } finally {
       setLoading(false)
     }
