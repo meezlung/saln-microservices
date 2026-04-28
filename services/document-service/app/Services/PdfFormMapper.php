@@ -119,7 +119,7 @@ final class PdfFormMapper
                 break;
             }
 
-            if ($row['is_public_official'] === true){
+            if ($row['is_public_official'] ?? false){
                 $count_govt_spouses++;
             }
 
@@ -133,11 +133,11 @@ final class PdfFormMapper
         }
 
         // account for first spouse
-        if ($spouse['is_public_official'] === true){
+        if ($spouse['is_public_official'] ?? false){
             $count_govt_spouses++;
         }
 
-        // force sep filing if > 1 spouse is in govt
+        // force sep filing if > 1 spouse is in sgovt
         if ($count_govt_spouses > 1){
             $pdf['joint_filing_check_box'] = self::checkbox(false);
             $pdf['filing_not_applicable_check_box'] = self::checkbox(false);
@@ -256,17 +256,17 @@ final class PdfFormMapper
         $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
         $real_properties = $form['assets']['real_properties'] ?? $form['real_properties'] ?? [];
         $personal_properties = $form['assets']['personal_properties'] ?? $form['personal_properties'] ?? [];
-        $temp = $form['business_interests'] ?? ['has_business_interest' => false, 'entries' => []];
+        $temp = $form['business_interests'] ?? ['has_business_interest' => false, 'entries' => []] ?? [];
         $business_interests = $temp['entries'] ?? $form['business_interests'] ?? [];
         $liabilities = $form['liabilities'] ?? [];
 
         $pdf = [
             // declarant
             'family_name'      => $declarant['family_name'] ?? $declarant['last_name'] ?? '',
-            'first_name'       => $declarant['first_name'],
-            'family_name_2'    => $declarant['middle_initial'],
-            'position'         => $declarant['position'],
-            'agency_office'    => $declarant['agency_office'],
+            'first_name'       => $declarant['first_name'] ?? '',
+            'family_name_2'    => $declarant['middle_initial'] ?? '',
+            'position'         => $declarant['position'] ?? '',
+            'agency_office'    => $declarant['agency_office'] ?? '',
             'as_of'            => new DateTime('last year december 31')->format('F j, Y'),
 
         ];
