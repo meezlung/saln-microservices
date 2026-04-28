@@ -687,12 +687,40 @@ function DashboardPage() {
     }
 
     applyEmptyIndicators()
-    formRoot.addEventListener('input', applyEmptyIndicators)
-    formRoot.addEventListener('change', applyEmptyIndicators)
+
+    let rafId = null
+    const scheduleApplyEmptyIndicators = () => {
+      try {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId)
+        }
+      } catch (e) {
+        rafId = null
+      }
+
+      rafId = requestAnimationFrame(() => {
+        try {
+          applyEmptyIndicators()
+        } finally {
+          rafId = null
+        }
+      })
+    }
+
+    formRoot.addEventListener('input', scheduleApplyEmptyIndicators)
+    formRoot.addEventListener('change', scheduleApplyEmptyIndicators)
 
     return () => {
-      formRoot.removeEventListener('input', applyEmptyIndicators)
-      formRoot.removeEventListener('change', applyEmptyIndicators)
+      if (rafId !== null) {
+        try {
+          cancelAnimationFrame(rafId)
+        } catch (e) {
+          // ignore
+        }
+        rafId = null
+      }
+      formRoot.removeEventListener('input', scheduleApplyEmptyIndicators)
+      formRoot.removeEventListener('change', scheduleApplyEmptyIndicators)
     }
   }, [formData, openSections, loading])
 
