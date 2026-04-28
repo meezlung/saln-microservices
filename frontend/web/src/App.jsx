@@ -310,7 +310,8 @@ function LoginPage() {
       setStep(2)
     } catch (err) {
       const message = err?.response?.data?.message || 'Failed to send verification code.'
-      setError(message)
+      const errorDetail = err?.response?.data?.error
+      setError(errorDetail ? `${message} (${errorDetail})` : message)
     } finally {
       setLoading(false)
     }
@@ -446,6 +447,7 @@ function DashboardPage() {
   const [notice, setNotice] = useState('')
   const [showInactivityModal, setShowInactivityModal] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [showNewEntryConfirm, setShowNewEntryConfirm] = useState(false)
   const [previewUrl, setPreviewUrl] = useState('')
   const [downloadUrl, setDownloadUrl] = useState('')
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
@@ -1153,6 +1155,34 @@ function DashboardPage() {
         </div>
       ) : null}
 
+      {showNewEntryConfirm ? (
+        <div className="modal active">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Start New Entry</h3>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to start a new entry? Unsaved changes will be lost.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowNewEntryConfirm(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  setShowNewEntryConfirm(false)
+                  await handleNewEntry()
+                }}
+              >
+                Start New Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showPreviewModal ? (
         <div className="modal active">
           <div className="modal-content preview-modal-content">
@@ -1198,7 +1228,7 @@ function DashboardPage() {
         <div className="container">
           <div className="navbar-content">
             <div className="navbar-left">
-              <button type="button" className="btn btn-secondary" onClick={handleNewEntry}>New Entry</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowNewEntryConfirm(true)}>New Entry</button>
               <button type="button" className="btn btn-secondary" onClick={() => importFileRef.current?.click()}>Import JSON</button>
               <input
                 ref={importFileRef}
