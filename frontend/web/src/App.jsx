@@ -2119,7 +2119,8 @@ function DashboardPage() {
           <h3 style={{ marginBottom: '12px' }}>Net Worth Summary</h3>
           <p style={{ margin: 0 }}><strong>Total Assets:</strong> PHP {formatCurrency(assetsTotal)}</p>
           <p style={{ margin: '8px 0 0 0', marginBottom: 0 }}><strong>Total Liabilities:</strong> PHP {formatCurrency(liabilitiesTotal)}</p>
-          <p style={{ marginTop: '12px', marginBottom: 0 }}>
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '12px 0' }} />
+          <p style={{ marginTop: 0, marginBottom: 0 }}>
             <strong>Net Worth:</strong> PHP {formatCurrency(netWorth)}
           </p>
         </div>
