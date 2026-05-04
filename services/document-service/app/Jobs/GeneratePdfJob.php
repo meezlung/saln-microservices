@@ -40,26 +40,28 @@ class GeneratePdfJob implements ShouldQueue
             
             $fileTempPaths = [];
             $page_index = 0;
+            $page_index_spouse = 0;
             $form_data = $doc->form_data; // lazy to change $form->data -> doc->form_data
-
+            
+            // for declarant
             $temp = $form_data['business_interests'] ?? ['has_business_interest' => false, 'entries' => []];
 
             if (array_key_exists('assets', $form_data)){
                 
                 if (count($form_data['assets']['real_properties']) > 4){
-                    $page_index = max([$page_index, (int)count($form_data['assets']['real_properties'])/4]);
+                    $page_index = max([$page_index, (int)(count($form_data['assets']['real_properties'])/4)]);
                 }
 
                 if (count($form_data['assets']['personal_properties']) > 6){
-                    $page_index = max([$page_index, (int)count($form_data['assets']['personal_properties'])/6]);
+                    $page_index = max([$page_index, (int)(count($form_data['assets']['personal_properties'])/6)]);
                 }
 
                 if (count($temp['entries']) > 3){
-                    $page_index = max([$page_index, (int)count($temp['entries'])/3]);
+                    $page_index = max([$page_index, (int)(count($temp['entries'])/3)]);
                 }
 
                 if (count($form_data['liabilities']) > 4){
-                    $page_index = max([$page_index, (int)count($form_data['liabilities'])/4]);
+                    $page_index = max([$page_index, (int)(count($form_data['liabilities'])/4)]);
                 } 
 
             } else{
@@ -72,7 +74,7 @@ class GeneratePdfJob implements ShouldQueue
                     {
                         if (count($form_data[$type]) > $size)
                         {
-                            $page_index = max([$page_index, (int)count($form_data[$type])/$size]);
+                            $page_index = max([$page_index, (int)(count($form_data[$type])/$size)]);
                         };
                     }
 
@@ -94,6 +96,11 @@ class GeneratePdfJob implements ShouldQueue
             ];
             }
 
+            // spouse and children
+            // TODO do the same as declarant
+
+            // combine page index from declarant overflow and spouse overflow
+
 
             for ($i = 0;$i<=$page_index;$i++)
             {   
@@ -110,15 +117,16 @@ class GeneratePdfJob implements ShouldQueue
                 $form_data['liabilities'] = $pages['liab'][$i] ?? [];
 
                 if ($i === 0){
-                    $mappedData = $mapper->mapA($form_data);
+                    $mappedData = $mapper->mapA($form_data, (string) $page_index + 2);
                     $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i,$doc);
                 }
                 else{
-                    $mappedData = $mapper->mapB($form_data);
+                    $mappedData = $mapper->mapB($form_data, (string) $page_index + 2, (string) $i + 2);
                     $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i,$doc);
                 }
 
             }
+
 
             // merge into final
             $mergedTmpDir = storage_path("app/tmp");

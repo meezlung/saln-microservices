@@ -51,7 +51,7 @@ final class PdfFormMapper
         return  $fmt->formatCurrency((float)$amount, 'PHP'); 
     }
 
-    public static function mapA(array $form): array
+    public static function mapA(array $form, string $page_count): array
     {   
         $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
         $spouse = $form['spouses'][0] ?? $form['spouse'] ?? [];
@@ -106,6 +106,10 @@ final class PdfFormMapper
             'spouse_position'      => $spouse['position'] ?? '',
             'spouse_agency_office' => $spouse['agency_office'] ?? '',
             'spouse_office_addr'   => $spouse['office_address'] ?? '',
+
+            // page numbers
+            'curr_page_num_1' => $page_count,
+            'curr_page_num_2' => $page_count,
 
         ];
 
@@ -251,7 +255,7 @@ final class PdfFormMapper
 
         return $pdf;
     }
-    public static function mapB(array $form): array
+    public static function mapB(array $form, string $page_count, string $page_num): array
     {
         $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
         $real_properties = $form['assets']['real_properties'] ?? $form['real_properties'] ?? [];
@@ -269,6 +273,116 @@ final class PdfFormMapper
             'agency_office'    => $declarant['agency_office'] ?? '',
             'as_of'            => new DateTime('last year december 31')->format('F j, Y'),
 
+            // page numbers
+            'curr_page_num' => $page_num,
+            'total_page_num' => $page_count,                
+        ];
+
+        // real propts
+        $realPropts_total = 0.0;
+        for ($i = 0; $i < 4; $i++) {
+            $row = $real_properties[$i] ?? [];
+
+            if ($row === []){
+                break;
+            }
+            $r = $i + 1;
+            
+            $pdf["real_properties_r{$r}c1"] = $row['description'] ?? '';
+            $pdf["real_properties_r{$r}c2"] = $row['kind'] ?? '';
+            $pdf["real_properties_r{$r}c3"] = $row['exact_location'] ?? '';
+            $pdf["real_properties_r{$r}c4"] = self::formatMoney($row['assessed_value'] ?? '');
+            $pdf["real_properties_r{$r}c5"] = self::formatMoney($row['current_fair_market_value'] ?? $row['fair_market_value'] ?? '');
+
+
+            $temp = $row['acquisition'] ?? [];
+            $pdf["real_properties_r{$r}c6"] = $row['year_of_acquisition'] ?? $temp['year'] ?? '';
+            $pdf["real_properties_r{$r}c7"] = $row['mode_of_acquisition'] ?? $temp['mode'] ?? '';
+
+
+            $realPropts_total += (float)($row['acquisition_cost'] ?? 0.0);
+            $realPropts_total += (float)($temp['cost'] ?? 0.0);
+            $pdf["real_properties_r{$r}c8"] = self::formatMoney($row['acquisition_cost'] ?? $temp['cost'] ?? '');
+            
+        }
+
+        //personal propts
+        $personalPropts_total = 0.0;
+        for ($i = 0; $i < 4; $i++) {
+            $row = $personal_properties[$i] ?? [];
+
+            if ($row === []){
+                break;
+            }
+
+            $r = $i + 1;
+
+            $pdf["personal_properties_r{$r}c1"] = $row['description'] ?? '';
+            $pdf["personal_properties_r{$r}c2"] = $row['acquisition_year'] ?? '';
+            $personalPropts_total += (float)($row['acquisition_cost_amount'] ?? 0.0);
+            $personalPropts_total += (float)($row['acquisition_cost'] ?? 0.0);
+            $pdf["personal_properties_r{$r}c3"] = self::formatMoney($row['acquisition_cost_amount'] ?? $row['acquisition_cost'] ?? '');
+        }
+
+        // liabilites
+        $liabilities_total = 0.0;
+        for ($i = 0; $i < 4; $i++) {
+            $row = $liabilities[$i] ?? [];
+            if ($row === []){
+                break;
+            }
+            $r = $i + 1;
+            // echo "hi from liabilties\n";
+            $pdf["liabilities_r{$r}c1"] = $row['nature'] ?? '';
+            $pdf["liabilities_r{$r}c2"] = $row['name_of_creditor'] ?? $row['creditor_name'] ?? '';
+            $liabilities_total += (float)($row['outstanding_balance'] ?? 0.0);
+            $pdf["liabilities_r{$r}c3"] = self::formatMoney($row['outstanding_balance'] ?? '');
+        }
+
+        // business interests
+        for ($i = 0; $i < 3; $i++) {
+            $row = $business_interests[$i] ?? [];
+            if ($row === []){
+                break;
+            }
+            $r = $i + 1;
+
+            $pdf["business_r{$r}c1"] = $row['name_of_entity_or_business_enterprise'] ?? $row['entity_name'] ?? '';
+            $pdf["business_r{$r}c2"] = $row['business_address'] ?? '';
+            $pdf["business_r{$r}c3"] = $row['nature_of_business_interest_or_financial_connection'] ?? $row['nature_of_interest'] ?? '';
+            $pdf["business_r{$r}c4"] = $row['date_of_acquisition'] ?? $row['date_acquired'] ?? '';
+        }
+
+        // subtotals and totals
+        $pdf['real_properties_subtotal']     = self::formatMoney((string)$realPropts_total);
+        $pdf['personal_properties_subtotal'] = self::formatMoney((string)$personalPropts_total);
+        $pdf['total_assets']                 = self::formatMoney((string)($realPropts_total + $personalPropts_total));
+        $pdf['total_liabilities']            = self::formatMoney((string)$liabilities_total);
+    
+        return $pdf;
+    }
+
+    public static function mapC(array $form, string $page_count, string $page_num): array
+    {
+        $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
+        $real_properties = $form['assets']['real_properties'] ?? $form['real_properties'] ?? [];
+        $personal_properties = $form['assets']['personal_properties'] ?? $form['personal_properties'] ?? [];
+        $temp = $form['business_interests'] ?? ['has_business_interest' => false, 'entries' => []] ?? [];
+        $business_interests = $temp['entries'] ?? $form['business_interests'] ?? [];
+        $liabilities = $form['liabilities'] ?? [];
+
+        $pdf = [
+            // declarant
+            'family_name'      => $declarant['family_name'] ?? $declarant['last_name'] ?? '',
+            'first_name'       => $declarant['first_name'] ?? '',
+            'family_name_2'    => $declarant['middle_initial'] ?? '',
+            'position'         => $declarant['position'] ?? '',
+            'agency_office'    => $declarant['agency_office'] ?? '',
+            'as_of'            => new DateTime('last year december 31')->format('F j, Y'),
+            
+            // page numbers
+            'curr_page_num' => $page_num,
+            'total_page_num' => $page_count,                
         ];
 
         // real propts
