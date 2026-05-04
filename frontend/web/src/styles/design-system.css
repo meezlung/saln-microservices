@@ -361,9 +361,13 @@
             background-color: rgba(77, 159, 255, 0.1);
             border-left: 4px solid var(--primary-color);
             padding: 16px;
-            margin: 24px 0;
+            margin: 24px 0 0;
             border-radius: var(--radius-sm);
             transition: var(--transition);
+        }
+
+        .privacy-notice-spacer {
+            height: 20px;
         }
 
         .privacy-notice p {
@@ -440,6 +444,47 @@
             .theme-toggle svg {
                 width: 20px;
                 height: 20px;
+            }
+        }
+
+        /* Sidebar toggle variant: reuse theme-toggle visuals but positioned for sidebar */
+        .sidebar-toggle {
+            /* Fixed at bottom-left to mirror theme-toggle (bottom-right) */
+            position: fixed;
+            left: 24px;
+            bottom: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            background-color: var(--primary-color);
+            color: white;
+            box-shadow: var(--shadow-lg);
+            border: none;
+            margin: 0;
+        }
+
+        /* Remove tilt/rotation on hover for the sidebar variant; keep a subtle scale */
+        .sidebar-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+        }
+
+        .sidebar-toggle:focus,
+        .sidebar-toggle:focus-visible {
+            outline: none;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar-toggle {
+                left: 16px;
+                bottom: 16px;
+                width: 48px;
+                height: 48px;
             }
         }
 
