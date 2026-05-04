@@ -167,7 +167,7 @@ class GeneratePdfJob implements ShouldQueue
                     $form_data['liabilities']['declarant'] = $pages['liab'][$i] ?? [];
 
                     if ($i === 0){
-                        print("Page index: {$i} inside A \n");
+                        // print("Page index: {$i} inside A \n");
 
                         if (array_key_exists('assets', $form_data)){
                         $form_data['assets']['declarant']['real_properties'] = $pages['real'][$i] ?? [];
@@ -182,7 +182,7 @@ class GeneratePdfJob implements ShouldQueue
                         $form_data['liabilities']['declarant'] = $pages['liab'][$i] ?? [];
 
                         $mappedData = $mapper->mapA($form_data, (string) $total_pages);
-                        $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i);
+                        $fileTempPaths[] = $filler->fillToFile('annexA', $mappedData,$i,$doc);
                     }
 
                     elseif ($i === 1){
@@ -190,7 +190,7 @@ class GeneratePdfJob implements ShouldQueue
                     }
 
                     else{
-                        print("Page index: {$i} inside B \n");
+                        // print("Page index: {$i} inside B \n");
                     
                         $local_i = $i - 1; // -1 because the first page of annex A is not counted in the pages for annex B
                         if (array_key_exists('assets', $form_data)){
@@ -206,12 +206,12 @@ class GeneratePdfJob implements ShouldQueue
                         $form_data['liabilities']['declarant'] = $pages['liab'][$local_i] ?? [];
 
                         $mappedData = $mapper->mapB($form_data, (string) $total_pages, (string) ($i + 1));
-                        $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i);
+                        $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i,$doc);
                     }
 
                 } else {
                     // SPOUSE (Annex C)
-                    print("Page index: {$i} inside C\n");
+                    // print("Page index: {$i} inside C\n");
                     $local_i = $i - ($page_index + 2);
 
                     if (array_key_exists('assets', $form_data)){
@@ -227,7 +227,7 @@ class GeneratePdfJob implements ShouldQueue
                     $form_data['liabilities']['spouse_children'] = $pages_spouse['liab'][$local_i] ?? [];
 
                     $mappedData = $mapper->mapC($form_data, (string) $total_pages, (string) ($i + 1));
-                    $fileTempPaths[] = $filler->fillToFile('annexC', $mappedData,$i, true);
+                    $fileTempPaths[] = $filler->fillToFile('annexC', $mappedData,$i, $doc);
                 }
             }
 
