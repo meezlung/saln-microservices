@@ -33,7 +33,7 @@ function createEmptyForm() {
   const lastYear = now.getFullYear() - 1
   const defaultAsOfDate = `${lastYear}-12-31`
   return {
-    schema_version: '1.0.0',
+    schema_version: '1.1.0',
     form_metadata: {
       form_type: 'SALN_2025',
       compliance_type: 'ASSUMPTION',
@@ -58,13 +58,28 @@ function createEmptyForm() {
     spouses: [],
     children_below_18: [],
     assets: {
-      real_properties: [],
-      personal_properties: [],
+      declarant: {
+        real_properties: [],
+        personal_properties: [],
+      },
+      spouse_children: {
+        real_properties: [],
+        personal_properties: [],
+      },
     },
-    liabilities: [],
+    liabilities: {
+      declarant: [],
+      spouse_children: [],
+    },
     business_interests: {
-      has_business_interest: false,
-      entries: [],
+      declarant: {
+        has_business_interest: false,
+        entries: [],
+      },
+      spouse_children: {
+        has_business_interest: false,
+        entries: [],
+      },
     },
     relatives_in_government: {
       has_relatives: false,
@@ -80,6 +95,15 @@ function createEmptyForm() {
 function normalizeFormData(raw) {
   const base = createEmptyForm()
   const data = raw && typeof raw === 'object' ? raw : {}
+
+  const assetsDeclarant = data.assets?.declarant
+  const assetsSpouseChildren = data.assets?.spouse_children
+
+  const liabilitiesDeclarant = data.liabilities?.declarant
+  const liabilitiesSpouseChildren = data.liabilities?.spouse_children
+
+  const businessDeclarant = data.business_interests?.declarant
+  const businessSpouseChildren = data.business_interests?.spouse_children
 
   return {
     ...base,
@@ -109,14 +133,48 @@ function normalizeFormData(raw) {
     assets: {
       ...base.assets,
       ...(data.assets || {}),
-      real_properties: Array.isArray(data.assets?.real_properties) ? data.assets.real_properties : [],
-      personal_properties: Array.isArray(data.assets?.personal_properties) ? data.assets.personal_properties : [],
+      declarant: {
+        ...base.assets.declarant,
+        ...(assetsDeclarant || {}),
+        real_properties: Array.isArray(assetsDeclarant?.real_properties) ? assetsDeclarant.real_properties : [],
+        personal_properties: Array.isArray(assetsDeclarant?.personal_properties) ? assetsDeclarant.personal_properties : [],
+      },
+      spouse_children: {
+        ...base.assets.spouse_children,
+        ...(assetsSpouseChildren || {}),
+        real_properties: Array.isArray(assetsSpouseChildren?.real_properties) ? assetsSpouseChildren.real_properties : [],
+        personal_properties: Array.isArray(assetsSpouseChildren?.personal_properties)
+          ? assetsSpouseChildren.personal_properties
+          : [],
+      },
     },
-    liabilities: Array.isArray(data.liabilities) ? data.liabilities : [],
+    liabilities: {
+      ...base.liabilities,
+      ...(typeof data.liabilities === 'object' && data.liabilities ? data.liabilities : {}),
+      declarant: Array.isArray(liabilitiesDeclarant) ? liabilitiesDeclarant : [],
+      spouse_children: Array.isArray(liabilitiesSpouseChildren) ? liabilitiesSpouseChildren : [],
+    },
     business_interests: {
       ...base.business_interests,
       ...(data.business_interests || {}),
-      entries: Array.isArray(data.business_interests?.entries) ? data.business_interests.entries : [],
+      declarant: {
+        ...base.business_interests.declarant,
+        ...(businessDeclarant || {}),
+        has_business_interest:
+          typeof businessDeclarant?.has_business_interest === 'boolean'
+            ? businessDeclarant.has_business_interest
+            : base.business_interests.declarant.has_business_interest,
+        entries: Array.isArray(businessDeclarant?.entries) ? businessDeclarant.entries : [],
+      },
+      spouse_children: {
+        ...base.business_interests.spouse_children,
+        ...(businessSpouseChildren || {}),
+        has_business_interest:
+          typeof businessSpouseChildren?.has_business_interest === 'boolean'
+            ? businessSpouseChildren.has_business_interest
+            : base.business_interests.spouse_children.has_business_interest,
+        entries: Array.isArray(businessSpouseChildren?.entries) ? businessSpouseChildren.entries : [],
+      },
     },
     relatives_in_government: {
       ...base.relatives_in_government,
@@ -368,7 +426,7 @@ function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-              <p className="form-help">We'll send you a 6-digit verification code</p>
+              <p className="form-help">We&apos;ll send you a 6-digit verification code</p>
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
@@ -475,9 +533,12 @@ function DashboardPage() {
       Object.keys(next).forEach((key) => {
         if (
           (key.startsWith('children_below_18.') && key.endsWith('.age')) ||
-          key.includes('assets.real_properties.') ||
-          key.includes('assets.personal_properties.') ||
-          key.includes('liabilities.')
+          key.includes('assets.declarant.real_properties.') ||
+          key.includes('assets.spouse_children.real_properties.') ||
+          key.includes('assets.declarant.personal_properties.') ||
+          key.includes('assets.spouse_children.personal_properties.') ||
+          key.includes('liabilities.declarant.') ||
+          key.includes('liabilities.spouse_children.')
         ) {
           delete next[key]
         }
@@ -501,58 +562,69 @@ function DashboardPage() {
         }
       })
 
-      formData.assets.real_properties.forEach((item, index) => {
-        const assessedValue = String(item?.assessed_value ?? '')
-        if (assessedValue !== '' && !DECIMAL_NUMBER_REGEX.test(assessedValue)) {
-          next[`assets.real_properties.${index}.assessed_value`] = 'Enter numbers only (up to 2 decimal places).'
-        }
+      const assetBuckets = ['declarant', 'spouse_children']
 
-        const fairMarketValue = String(item?.fair_market_value ?? '')
-        if (fairMarketValue !== '' && !DECIMAL_NUMBER_REGEX.test(fairMarketValue)) {
-          next[`assets.real_properties.${index}.fair_market_value`] = 'Enter numbers only (up to 2 decimal places).'
-        }
+      assetBuckets.forEach((bucket) => {
+        const realItems = formData.assets?.[bucket]?.real_properties || []
+        const personalItems = formData.assets?.[bucket]?.personal_properties || []
 
-        const acquisitionCost = String(item?.acquisition?.cost ?? '')
-        if (acquisitionCost !== '' && !DECIMAL_NUMBER_REGEX.test(acquisitionCost)) {
-          next[`assets.real_properties.${index}.acquisition.cost`] = 'Enter numbers only (up to 2 decimal places).'
-        }
-      })
+        realItems.forEach((item, index) => {
+          const assessedValue = String(item?.assessed_value ?? '')
+          if (assessedValue !== '' && !DECIMAL_NUMBER_REGEX.test(assessedValue)) {
+            next[`assets.${bucket}.real_properties.${index}.assessed_value`] = 'Enter numbers only (up to 2 decimal places).'
+          }
 
-      formData.assets.personal_properties.forEach((item, index) => {
-        const acquisitionCost = String(item?.acquisition_cost ?? '')
-        if (acquisitionCost !== '' && !DECIMAL_NUMBER_REGEX.test(acquisitionCost)) {
-          next[`assets.personal_properties.${index}.acquisition_cost`] = 'Enter numbers only (up to 2 decimal places).'
-        }
-      })
+          const fairMarketValue = String(item?.fair_market_value ?? '')
+          if (fairMarketValue !== '' && !DECIMAL_NUMBER_REGEX.test(fairMarketValue)) {
+            next[`assets.${bucket}.real_properties.${index}.fair_market_value`] = 'Enter numbers only (up to 2 decimal places).'
+          }
 
-      formData.liabilities.forEach((item, index) => {
-        const outstandingBalance = String(item?.outstanding_balance ?? '')
-        if (outstandingBalance !== '' && !DECIMAL_NUMBER_REGEX.test(outstandingBalance)) {
-          next[`liabilities.${index}.outstanding_balance`] = 'Enter numbers only (up to 2 decimal places).'
-        }
+          const acquisitionCost = String(item?.acquisition?.cost ?? '')
+          if (acquisitionCost !== '' && !DECIMAL_NUMBER_REGEX.test(acquisitionCost)) {
+            next[`assets.${bucket}.real_properties.${index}.acquisition.cost`] = 'Enter numbers only (up to 2 decimal places).'
+          }
+        })
+
+        personalItems.forEach((item, index) => {
+          const acquisitionCost = String(item?.acquisition_cost ?? '')
+          if (acquisitionCost !== '' && !DECIMAL_NUMBER_REGEX.test(acquisitionCost)) {
+            next[`assets.${bucket}.personal_properties.${index}.acquisition_cost`] = 'Enter numbers only (up to 2 decimal places).'
+          }
+        })
+
+        const liabilitiesItems = formData.liabilities?.[bucket] || []
+        liabilitiesItems.forEach((item, index) => {
+          const outstandingBalance = String(item?.outstanding_balance ?? '')
+          if (outstandingBalance !== '' && !DECIMAL_NUMBER_REGEX.test(outstandingBalance)) {
+            next[`liabilities.${bucket}.${index}.outstanding_balance`] = 'Enter numbers only (up to 2 decimal places).'
+          }
+        })
       })
 
       return next
     })
   }, [
     formData.children_below_18,
-    formData.assets.real_properties,
-    formData.assets.personal_properties,
+    formData.assets,
+    formData.assets.declarant.real_properties,
+    formData.assets.declarant.personal_properties,
+    formData.assets.spouse_children.real_properties,
+    formData.assets.spouse_children.personal_properties,
     formData.liabilities,
+    formData.liabilities.declarant,
+    formData.liabilities.spouse_children,
   ])
 
-  const realTotal = formData.assets.real_properties.reduce(
-    (sum, item) => sum + Number(item.fair_market_value || 0),
-    0,
-  )
-  const personalTotal = formData.assets.personal_properties.reduce(
-    (sum, item) => sum + Number(item.acquisition_cost || 0),
-    0,
-  )
-  const liabilitiesTotal = formData.liabilities.reduce(
-    (sum, item) => sum + Number(item.outstanding_balance || 0),
-    0,
-  )
+  const allRealProperties = [...formData.assets.declarant.real_properties, ...formData.assets.spouse_children.real_properties]
+  const allPersonalProperties = [
+    ...formData.assets.declarant.personal_properties,
+    ...formData.assets.spouse_children.personal_properties,
+  ]
+  const allLiabilities = [...formData.liabilities.declarant, ...formData.liabilities.spouse_children]
+
+  const realTotal = allRealProperties.reduce((sum, item) => sum + Number(item.fair_market_value || 0), 0)
+  const personalTotal = allPersonalProperties.reduce((sum, item) => sum + Number(item.acquisition_cost || 0), 0)
+  const liabilitiesTotal = allLiabilities.reduce((sum, item) => sum + Number(item.outstanding_balance || 0), 0)
   const assetsTotal = realTotal + personalTotal
   const netWorth = assetsTotal - liabilitiesTotal
 
@@ -694,7 +766,7 @@ function DashboardPage() {
         if (rafId !== null) {
           cancelAnimationFrame(rafId)
         }
-      } catch (e) {
+      } catch {
         rafId = null
       }
 
@@ -714,7 +786,7 @@ function DashboardPage() {
       if (rafId !== null) {
         try {
           cancelAnimationFrame(rafId)
-        } catch (e) {
+        } catch {
           // ignore
         }
         rafId = null
@@ -822,8 +894,8 @@ function DashboardPage() {
     })
   }
 
-  function setRealPropertyValueField(index, field, value) {
-    const errorKey = `assets.real_properties.${index}.${field}`
+  function setRealPropertyValueField(bucket, index, field, value) {
+    const errorKey = `assets.${bucket}.real_properties.${index}.${field}`
 
     if (!DECIMAL_NUMBER_REGEX.test(value)) {
       setNumericFieldError(errorKey, 'Enter numbers only (up to 2 decimal places).')
@@ -834,16 +906,16 @@ function DashboardPage() {
 
     updateForm((next) => {
       if (field === 'acquisition.cost') {
-        next.assets.real_properties[index].acquisition.cost = value
+        next.assets[bucket].real_properties[index].acquisition.cost = value
         return
       }
 
-      next.assets.real_properties[index][field] = value
+      next.assets[bucket].real_properties[index][field] = value
     })
   }
 
-  function setPersonalPropertyCostField(index, value) {
-    const errorKey = `assets.personal_properties.${index}.acquisition_cost`
+  function setPersonalPropertyCostField(bucket, index, value) {
+    const errorKey = `assets.${bucket}.personal_properties.${index}.acquisition_cost`
 
     if (!DECIMAL_NUMBER_REGEX.test(value)) {
       setNumericFieldError(errorKey, 'Enter numbers only (up to 2 decimal places).')
@@ -853,12 +925,12 @@ function DashboardPage() {
     setNumericFieldError(errorKey, '')
 
     updateForm((next) => {
-      next.assets.personal_properties[index].acquisition_cost = value
+      next.assets[bucket].personal_properties[index].acquisition_cost = value
     })
   }
 
-  function setLiabilityBalanceField(index, value) {
-    const errorKey = `liabilities.${index}.outstanding_balance`
+  function setLiabilityBalanceField(bucket, index, value) {
+    const errorKey = `liabilities.${bucket}.${index}.outstanding_balance`
 
     if (!DECIMAL_NUMBER_REGEX.test(value)) {
       setNumericFieldError(errorKey, 'Enter numbers only (up to 2 decimal places).')
@@ -868,7 +940,7 @@ function DashboardPage() {
     setNumericFieldError(errorKey, '')
 
     updateForm((next) => {
-      next.liabilities[index].outstanding_balance = value
+      next.liabilities[bucket][index].outstanding_balance = value
     })
   }
 
@@ -921,21 +993,33 @@ function DashboardPage() {
     })
   }
 
-  function addAssetItem(key, templateFactory) {
+  function addLiabilityItem(bucket, templateFactory) {
     updateForm((next) => {
-      next.assets[key].push(templateFactory())
+      next.liabilities[bucket].push(templateFactory())
     })
   }
 
-  function removeAssetItem(key, index) {
+  function removeLiabilityItem(bucket, index) {
     updateForm((next) => {
-      next.assets[key].splice(index, 1)
+      next.liabilities[bucket].splice(index, 1)
     })
   }
 
-  function addBusinessEntry() {
+  function addAssetItem(bucket, key, templateFactory) {
     updateForm((next) => {
-      next.business_interests.entries.push({
+      next.assets[bucket][key].push(templateFactory())
+    })
+  }
+
+  function removeAssetItem(bucket, key, index) {
+    updateForm((next) => {
+      next.assets[bucket][key].splice(index, 1)
+    })
+  }
+
+  function addBusinessEntry(bucket) {
+    updateForm((next) => {
+      next.business_interests[bucket].entries.push({
         entity_name: '',
         business_address: '',
         nature_of_interest: '',
@@ -944,9 +1028,9 @@ function DashboardPage() {
     })
   }
 
-  function removeBusinessEntry(index) {
+  function removeBusinessEntry(bucket, index) {
     updateForm((next) => {
-      next.business_interests.entries.splice(index, 1)
+      next.business_interests[bucket].entries.splice(index, 1)
     })
   }
 
@@ -1144,22 +1228,10 @@ function DashboardPage() {
   }
 
   // Section summaries
-  const realPropertiesFairMarketTotal = formData.assets.real_properties.reduce(
-    (sum, item) => sum + Number(item.fair_market_value || 0),
-    0,
-  )
-  const realPropertiesAssessedTotal = formData.assets.real_properties.reduce(
-    (sum, item) => sum + Number(item.assessed_value || 0),
-    0,
-  )
-  const personalPropertiesTotal = formData.assets.personal_properties.reduce(
-    (sum, item) => sum + Number(item.acquisition_cost || 0),
-    0,
-  )
-  const liabilitiesOutstandingTotal = formData.liabilities.reduce(
-    (sum, item) => sum + Number(item.outstanding_balance || 0),
-    0,
-  )
+  const realPropertiesFairMarketTotal = allRealProperties.reduce((sum, item) => sum + Number(item.fair_market_value || 0), 0)
+  const realPropertiesAssessedTotal = allRealProperties.reduce((sum, item) => sum + Number(item.assessed_value || 0), 0)
+  const personalPropertiesTotal = allPersonalProperties.reduce((sum, item) => sum + Number(item.acquisition_cost || 0), 0)
+  const liabilitiesOutstandingTotal = allLiabilities.reduce((sum, item) => sum + Number(item.outstanding_balance || 0), 0)
 
   return (
     <>
@@ -1595,9 +1667,14 @@ function DashboardPage() {
             <span className="section-toggle">{openSections.realProperties ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.realProperties ? 'active' : ''}`}>
-            {formData.assets.real_properties.map((item, index) => (
-              <div className="repeater-item" key={`real-${index}`}>
-                <button type="button" className="repeater-remove" onClick={() => removeAssetItem('real_properties', index)}>
+            <h4 style={{ marginTop: 0 }}>Declarant</h4>
+            {formData.assets.declarant.real_properties.map((item, index) => (
+              <div className="repeater-item" key={`real-declarant-${index}`}>
+                <button
+                  type="button"
+                  className="repeater-remove"
+                  onClick={() => removeAssetItem('declarant', 'real_properties', index)}
+                >
                   ×
                 </button>
 
@@ -1608,7 +1685,7 @@ function DashboardPage() {
                     value={item.description || ''}
                     onChange={(e) =>
                       updateForm((next) => {
-                        next.assets.real_properties[index].description = e.target.value
+                        next.assets.declarant.real_properties[index].description = e.target.value
                       })
                     }
                   />
@@ -1621,7 +1698,7 @@ function DashboardPage() {
                       value={item.kind || ''}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.assets.real_properties[index].kind = e.target.value
+                          next.assets.declarant.real_properties[index].kind = e.target.value
                         })
                       }
                     >
@@ -1640,7 +1717,7 @@ function DashboardPage() {
                       value={item.exact_location || ''}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.assets.real_properties[index].exact_location = e.target.value
+                          next.assets.declarant.real_properties[index].exact_location = e.target.value
                         })
                       }
                     />
@@ -1654,11 +1731,11 @@ function DashboardPage() {
                       type="text"
                       inputMode="decimal"
                       value={item.assessed_value || ''}
-                      onChange={(e) => setRealPropertyValueField(index, 'assessed_value', e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.real_properties.${index}.assessed_value`]}
+                      onChange={(e) => setRealPropertyValueField('declarant', index, 'assessed_value', e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`]}
                     />
-                    {numericFieldErrors[`assets.real_properties.${index}.assessed_value`] ? (
-                      <p className="error">{numericFieldErrors[`assets.real_properties.${index}.assessed_value`]}</p>
+                    {numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`] ? (
+                      <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`]}</p>
                     ) : null}
                   </div>
                   <div className="form-group">
@@ -1667,11 +1744,11 @@ function DashboardPage() {
                       type="text"
                       inputMode="decimal"
                       value={item.fair_market_value || ''}
-                      onChange={(e) => setRealPropertyValueField(index, 'fair_market_value', e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.real_properties.${index}.fair_market_value`]}
+                      onChange={(e) => setRealPropertyValueField('declarant', index, 'fair_market_value', e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`]}
                     />
-                    {numericFieldErrors[`assets.real_properties.${index}.fair_market_value`] ? (
-                      <p className="error">{numericFieldErrors[`assets.real_properties.${index}.fair_market_value`]}</p>
+                    {numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`] ? (
+                      <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`]}</p>
                     ) : null}
                   </div>
                 </div>
@@ -1687,7 +1764,7 @@ function DashboardPage() {
                       value={item.acquisition?.year || ''}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.assets.real_properties[index].acquisition.year = e.target.value
+                          next.assets.declarant.real_properties[index].acquisition.year = e.target.value
                         })
                       }
                     />
@@ -1698,7 +1775,7 @@ function DashboardPage() {
                       value={item.acquisition?.mode || ''}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.assets.real_properties[index].acquisition.mode = e.target.value
+                          next.assets.declarant.real_properties[index].acquisition.mode = e.target.value
                         })
                       }
                     >
@@ -1715,11 +1792,11 @@ function DashboardPage() {
                       type="text"
                       inputMode="decimal"
                       value={item.acquisition?.cost || ''}
-                      onChange={(e) => setRealPropertyValueField(index, 'acquisition.cost', e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.real_properties.${index}.acquisition.cost`]}
+                      onChange={(e) => setRealPropertyValueField('declarant', index, 'acquisition.cost', e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`]}
                     />
-                    {numericFieldErrors[`assets.real_properties.${index}.acquisition.cost`] ? (
-                      <p className="error">{numericFieldErrors[`assets.real_properties.${index}.acquisition.cost`]}</p>
+                    {numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`] ? (
+                      <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`]}</p>
                     ) : null}
                   </div>
                 </div>
@@ -1730,7 +1807,7 @@ function DashboardPage() {
               type="button"
               className="btn btn-add-item"
               onClick={() =>
-                addAssetItem('real_properties', () => ({
+                addAssetItem('declarant', 'real_properties', () => ({
                   description: '',
                   kind: '',
                   exact_location: '',
@@ -1740,7 +1817,166 @@ function DashboardPage() {
                 }))
               }
             >
-              + Add Real Property
+              + Add Declarant Real Property
+            </button>
+
+            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
+            {formData.assets.spouse_children.real_properties.map((item, index) => (
+              <div className="repeater-item" key={`real-spouse_children-${index}`}>
+                <button
+                  type="button"
+                  className="repeater-remove"
+                  onClick={() => removeAssetItem('spouse_children', 'real_properties', index)}
+                >
+                  ×
+                </button>
+
+                <div className="form-group">
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    value={item.description || ''}
+                    onChange={(e) =>
+                      updateForm((next) => {
+                        next.assets.spouse_children.real_properties[index].description = e.target.value
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Kind</label>
+                    <select
+                      value={item.kind || ''}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.assets.spouse_children.real_properties[index].kind = e.target.value
+                        })
+                      }
+                    >
+                      <option value="">Select</option>
+                      <option value="RESIDENTIAL">Residential</option>
+                      <option value="COMMERCIAL">Commercial</option>
+                      <option value="INDUSTRIAL">Industrial</option>
+                      <option value="AGRICULTURAL">Agricultural</option>
+                      <option value="MIXED_USE">Mixed Use</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      value={item.exact_location || ''}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.assets.spouse_children.real_properties[index].exact_location = e.target.value
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Assessed Value (PHP)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={item.assessed_value || ''}
+                      onChange={(e) =>
+                        setRealPropertyValueField('spouse_children', index, 'assessed_value', e.target.value)
+                      }
+                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`]}
+                    />
+                    {numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`] ? (
+                      <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`]}</p>
+                    ) : null}
+                  </div>
+                  <div className="form-group">
+                    <label>Fair Market Value (PHP)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={item.fair_market_value || ''}
+                      onChange={(e) =>
+                        setRealPropertyValueField('spouse_children', index, 'fair_market_value', e.target.value)
+                      }
+                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`]}
+                    />
+                    {numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`] ? (
+                      <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`]}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <h4 style={{ marginTop: '16px' }}>Acquisition</h4>
+                <div className="form-row-3">
+                  <div className="form-group">
+                    <label>Year</label>
+                    <input
+                      type="number"
+                      min={1900}
+                      max={2100}
+                      value={item.acquisition?.year || ''}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.assets.spouse_children.real_properties[index].acquisition.year = e.target.value
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Mode</label>
+                    <select
+                      value={item.acquisition?.mode || ''}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.assets.spouse_children.real_properties[index].acquisition.mode = e.target.value
+                        })
+                      }
+                    >
+                      <option value="">Select</option>
+                      <option value="PURCHASE">Purchase</option>
+                      <option value="INHERITANCE">Inheritance</option>
+                      <option value="DONATION">Donation</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Cost (PHP)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={item.acquisition?.cost || ''}
+                      onChange={(e) =>
+                        setRealPropertyValueField('spouse_children', index, 'acquisition.cost', e.target.value)
+                      }
+                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`]}
+                    />
+                    {numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`] ? (
+                      <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`]}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              className="btn btn-add-item"
+              onClick={() =>
+                addAssetItem('spouse_children', 'real_properties', () => ({
+                  description: '',
+                  kind: '',
+                  exact_location: '',
+                  assessed_value: '',
+                  fair_market_value: '',
+                  acquisition: { year: '', mode: '', cost: '' },
+                }))
+              }
+            >
+              + Add Spouse/Children Real Property
             </button>
           </div>
         </div>
@@ -1755,9 +1991,14 @@ function DashboardPage() {
             <span className="section-toggle">{openSections.personalProperties ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.personalProperties ? 'active' : ''}`}>
-            {formData.assets.personal_properties.map((item, index) => (
-              <div className="repeater-item" key={`personal-${index}`}>
-                <button type="button" className="repeater-remove" onClick={() => removeAssetItem('personal_properties', index)}>
+            <h4 style={{ marginTop: 0 }}>Declarant</h4>
+            {formData.assets.declarant.personal_properties.map((item, index) => (
+              <div className="repeater-item" key={`personal-declarant-${index}`}>
+                <button
+                  type="button"
+                  className="repeater-remove"
+                  onClick={() => removeAssetItem('declarant', 'personal_properties', index)}
+                >
                   ×
                 </button>
 
@@ -1768,7 +2009,7 @@ function DashboardPage() {
                     value={item.description || ''}
                     onChange={(e) =>
                       updateForm((next) => {
-                        next.assets.personal_properties[index].description = e.target.value
+                        next.assets.declarant.personal_properties[index].description = e.target.value
                       })
                     }
                   />
@@ -1784,7 +2025,7 @@ function DashboardPage() {
                       value={item.acquisition_year || ''}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.assets.personal_properties[index].acquisition_year = e.target.value
+                          next.assets.declarant.personal_properties[index].acquisition_year = e.target.value
                         })
                       }
                     />
@@ -1795,11 +2036,11 @@ function DashboardPage() {
                       type="text"
                       inputMode="decimal"
                       value={item.acquisition_cost || ''}
-                      onChange={(e) => setPersonalPropertyCostField(index, e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.personal_properties.${index}.acquisition_cost`]}
+                      onChange={(e) => setPersonalPropertyCostField('declarant', index, e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`]}
                     />
-                    {numericFieldErrors[`assets.personal_properties.${index}.acquisition_cost`] ? (
-                      <p className="error">{numericFieldErrors[`assets.personal_properties.${index}.acquisition_cost`]}</p>
+                    {numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`] ? (
+                      <p className="error">{numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`]}</p>
                     ) : null}
                   </div>
                 </div>
@@ -1810,14 +2051,84 @@ function DashboardPage() {
               type="button"
               className="btn btn-add-item"
               onClick={() =>
-                addAssetItem('personal_properties', () => ({
+                addAssetItem('declarant', 'personal_properties', () => ({
                   description: '',
                   acquisition_year: '',
                   acquisition_cost: '',
                 }))
               }
             >
-              + Add Personal Property
+              + Add Declarant Personal Property
+            </button>
+
+            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
+            {formData.assets.spouse_children.personal_properties.map((item, index) => (
+              <div className="repeater-item" key={`personal-spouse_children-${index}`}>
+                <button
+                  type="button"
+                  className="repeater-remove"
+                  onClick={() => removeAssetItem('spouse_children', 'personal_properties', index)}
+                >
+                  ×
+                </button>
+
+                <div className="form-group">
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    value={item.description || ''}
+                    onChange={(e) =>
+                      updateForm((next) => {
+                        next.assets.spouse_children.personal_properties[index].description = e.target.value
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Year Acquired</label>
+                    <input
+                      type="number"
+                      min={1900}
+                      max={2100}
+                      value={item.acquisition_year || ''}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.assets.spouse_children.personal_properties[index].acquisition_year = e.target.value
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Acquisition Cost (PHP)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={item.acquisition_cost || ''}
+                      onChange={(e) => setPersonalPropertyCostField('spouse_children', index, e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`]}
+                    />
+                    {numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`] ? (
+                      <p className="error">{numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`]}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              className="btn btn-add-item"
+              onClick={() =>
+                addAssetItem('spouse_children', 'personal_properties', () => ({
+                  description: '',
+                  acquisition_year: '',
+                  acquisition_cost: '',
+                }))
+              }
+            >
+              + Add Spouse/Children Personal Property
             </button>
           </div>
         </div>
@@ -1832,9 +2143,10 @@ function DashboardPage() {
             <span className="section-toggle">{openSections.liabilities ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.liabilities ? 'active' : ''}`}>
-            {formData.liabilities.map((item, index) => (
-              <div className="repeater-item" key={`liability-${index}`}>
-                <button type="button" className="repeater-remove" onClick={() => removeItem('liabilities', index)}>
+            <h4 style={{ marginTop: 0 }}>Declarant</h4>
+            {formData.liabilities.declarant.map((item, index) => (
+              <div className="repeater-item" key={`liability-declarant-${index}`}>
+                <button type="button" className="repeater-remove" onClick={() => removeLiabilityItem('declarant', index)}>
                   ×
                 </button>
 
@@ -1846,7 +2158,7 @@ function DashboardPage() {
                       value={item.nature || ''}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.liabilities[index].nature = e.target.value
+                          next.liabilities.declarant[index].nature = e.target.value
                         })
                       }
                     />
@@ -1858,7 +2170,7 @@ function DashboardPage() {
                       value={item.creditor_name || ''}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.liabilities[index].creditor_name = e.target.value
+                          next.liabilities.declarant[index].creditor_name = e.target.value
                         })
                       }
                     />
@@ -1869,11 +2181,11 @@ function DashboardPage() {
                       type="text"
                       inputMode="decimal"
                       value={item.outstanding_balance || ''}
-                      onChange={(e) => setLiabilityBalanceField(index, e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`liabilities.${index}.outstanding_balance`]}
+                      onChange={(e) => setLiabilityBalanceField('declarant', index, e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`]}
                     />
-                    {numericFieldErrors[`liabilities.${index}.outstanding_balance`] ? (
-                      <p className="error">{numericFieldErrors[`liabilities.${index}.outstanding_balance`]}</p>
+                    {numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`] ? (
+                      <p className="error">{numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`]}</p>
                     ) : null}
                   </div>
                 </div>
@@ -1883,9 +2195,72 @@ function DashboardPage() {
             <button
               type="button"
               className="btn btn-add-item"
-              onClick={() => addItem('liabilities', () => ({ nature: '', creditor_name: '', outstanding_balance: '' }))}
+              onClick={() => addLiabilityItem('declarant', () => ({ nature: '', creditor_name: '', outstanding_balance: '' }))}
             >
-              + Add Liability
+              + Add Declarant Liability
+            </button>
+
+            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
+            {formData.liabilities.spouse_children.map((item, index) => (
+              <div className="repeater-item" key={`liability-spouse_children-${index}`}>
+                <button
+                  type="button"
+                  className="repeater-remove"
+                  onClick={() => removeLiabilityItem('spouse_children', index)}
+                >
+                  ×
+                </button>
+
+                <div className="form-row-3">
+                  <div className="form-group">
+                    <label>Nature</label>
+                    <input
+                      type="text"
+                      value={item.nature || ''}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.liabilities.spouse_children[index].nature = e.target.value
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Creditor Name</label>
+                    <input
+                      type="text"
+                      value={item.creditor_name || ''}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.liabilities.spouse_children[index].creditor_name = e.target.value
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Outstanding Balance (PHP)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={item.outstanding_balance || ''}
+                      onChange={(e) => setLiabilityBalanceField('spouse_children', index, e.target.value)}
+                      aria-invalid={!!numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`]}
+                    />
+                    {numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`] ? (
+                      <p className="error">{numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`]}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              className="btn btn-add-item"
+              onClick={() =>
+                addLiabilityItem('spouse_children', () => ({ nature: '', creditor_name: '', outstanding_balance: '' }))
+              }
+            >
+              + Add Spouse/Children Liability
             </button>
           </div>
         </div>
@@ -1899,17 +2274,18 @@ function DashboardPage() {
             <span className="section-toggle">{openSections.business ? '−' : '+'}</span>
           </div>
           <div className={`section-content ${openSections.business ? 'active' : ''}`}>
+            <h4 style={{ marginTop: 0 }}>Declarant</h4>
             <div className="form-group">
               <label>
                 <input
                   type="checkbox"
-                  checked={!formData.business_interests.has_business_interest}
+                  checked={!formData.business_interests.declarant.has_business_interest}
                   onChange={(e) =>
                     updateForm((next) => {
                       const isNotApplicable = e.target.checked
-                      next.business_interests.has_business_interest = !isNotApplicable
+                      next.business_interests.declarant.has_business_interest = !isNotApplicable
                       if (isNotApplicable) {
-                        next.business_interests.entries = []
+                        next.business_interests.declarant.entries = []
                       }
                     })
                   }
@@ -1918,10 +2294,14 @@ function DashboardPage() {
               </label>
             </div>
 
-            {formData.business_interests.has_business_interest
-              ? formData.business_interests.entries.map((item, index) => (
-                  <div className="repeater-item" key={`business-${index}`}>
-                    <button type="button" className="repeater-remove" onClick={() => removeBusinessEntry(index)}>
+            {formData.business_interests.declarant.has_business_interest
+              ? formData.business_interests.declarant.entries.map((item, index) => (
+                  <div className="repeater-item" key={`business-declarant-${index}`}>
+                    <button
+                      type="button"
+                      className="repeater-remove"
+                      onClick={() => removeBusinessEntry('declarant', index)}
+                    >
                       ×
                     </button>
 
@@ -1932,7 +2312,7 @@ function DashboardPage() {
                         value={item.entity_name || ''}
                         onChange={(e) =>
                           updateForm((next) => {
-                            next.business_interests.entries[index].entity_name = e.target.value
+                            next.business_interests.declarant.entries[index].entity_name = e.target.value
                           })
                         }
                       />
@@ -1945,7 +2325,7 @@ function DashboardPage() {
                         value={item.business_address || ''}
                         onChange={(e) =>
                           updateForm((next) => {
-                            next.business_interests.entries[index].business_address = e.target.value
+                            next.business_interests.declarant.entries[index].business_address = e.target.value
                           })
                         }
                       />
@@ -1959,7 +2339,7 @@ function DashboardPage() {
                           value={item.nature_of_interest || ''}
                           onChange={(e) =>
                             updateForm((next) => {
-                              next.business_interests.entries[index].nature_of_interest = e.target.value
+                              next.business_interests.declarant.entries[index].nature_of_interest = e.target.value
                             })
                           }
                         />
@@ -1971,7 +2351,7 @@ function DashboardPage() {
                           value={item.date_acquired || ''}
                           onChange={(e) =>
                             updateForm((next) => {
-                              next.business_interests.entries[index].date_acquired = e.target.value
+                              next.business_interests.declarant.entries[index].date_acquired = e.target.value
                             })
                           }
                         />
@@ -1981,9 +2361,102 @@ function DashboardPage() {
                 ))
               : null}
 
-            {formData.business_interests.has_business_interest ? (
-              <button type="button" className="btn btn-add-item" onClick={addBusinessEntry}>
-                + Add Business Interest
+            {formData.business_interests.declarant.has_business_interest ? (
+              <button type="button" className="btn btn-add-item" onClick={() => addBusinessEntry('declarant')}>
+                + Add Declarant Business Interest
+              </button>
+            ) : null}
+
+            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
+            <div className="form-group">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!formData.business_interests.spouse_children.has_business_interest}
+                  onChange={(e) =>
+                    updateForm((next) => {
+                      const isNotApplicable = e.target.checked
+                      next.business_interests.spouse_children.has_business_interest = !isNotApplicable
+                      if (isNotApplicable) {
+                        next.business_interests.spouse_children.entries = []
+                      }
+                    })
+                  }
+                />{' '}
+                N/A
+              </label>
+            </div>
+
+            {formData.business_interests.spouse_children.has_business_interest
+              ? formData.business_interests.spouse_children.entries.map((item, index) => (
+                  <div className="repeater-item" key={`business-spouse_children-${index}`}>
+                    <button
+                      type="button"
+                      className="repeater-remove"
+                      onClick={() => removeBusinessEntry('spouse_children', index)}
+                    >
+                      ×
+                    </button>
+
+                    <div className="form-group">
+                      <label>Entity Name</label>
+                      <input
+                        type="text"
+                        value={item.entity_name || ''}
+                        onChange={(e) =>
+                          updateForm((next) => {
+                            next.business_interests.spouse_children.entries[index].entity_name = e.target.value
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Business Address</label>
+                      <input
+                        type="text"
+                        value={item.business_address || ''}
+                        onChange={(e) =>
+                          updateForm((next) => {
+                            next.business_interests.spouse_children.entries[index].business_address = e.target.value
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Nature of Interest</label>
+                        <input
+                          type="text"
+                          value={item.nature_of_interest || ''}
+                          onChange={(e) =>
+                            updateForm((next) => {
+                              next.business_interests.spouse_children.entries[index].nature_of_interest = e.target.value
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Date Acquired</label>
+                        <input
+                          type="date"
+                          value={item.date_acquired || ''}
+                          onChange={(e) =>
+                            updateForm((next) => {
+                              next.business_interests.spouse_children.entries[index].date_acquired = e.target.value
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              : null}
+
+            {formData.business_interests.spouse_children.has_business_interest ? (
+              <button type="button" className="btn btn-add-item" onClick={() => addBusinessEntry('spouse_children')}>
+                + Add Spouse/Children Business Interest
               </button>
             ) : null}
           </div>
