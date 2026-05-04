@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
   authApi,
@@ -16,6 +16,18 @@ const WHOLE_NUMBER_REGEX = /^\d*$/
 const DECIMAL_NUMBER_REGEX = /^\d*(\.\d{0,2})?$/
 const PDF_POLL_INTERVAL_MS = 2000
 const PDF_POLL_MAX_ATTEMPTS = 30
+
+function generateRowId(prefix) {
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+      return `${prefix}_${globalThis.crypto.randomUUID()}`
+    }
+  } catch {
+    // ignore
+  }
+
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
 
 function getInitialTheme() {
   const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
@@ -105,6 +117,18 @@ function normalizeFormData(raw) {
   const businessDeclarant = data.business_interests?.declarant
   const businessSpouseChildren = data.business_interests?.spouse_children
 
+  const rawSpouses = Array.isArray(data.spouses) ? data.spouses : data.spouse ? [{ ...data.spouse }] : []
+  const spouses = rawSpouses.map((spouse) => {
+    const id = typeof spouse?.id === 'string' && spouse.id ? spouse.id : generateRowId('spouse')
+    return { ...spouse, id }
+  })
+
+  const rawChildren = Array.isArray(data.children_below_18) ? data.children_below_18 : []
+  const children_below_18 = rawChildren.map((child) => {
+    const id = typeof child?.id === 'string' && child.id ? child.id : generateRowId('child')
+    return { ...child, id }
+  })
+
   return {
     ...base,
     ...data,
@@ -124,12 +148,8 @@ function normalizeFormData(raw) {
         },
       },
     },
-    spouses: Array.isArray(data.spouses)
-      ? data.spouses.map((spouse) => ({ ...spouse }))
-      : data.spouse
-      ? [{ ...data.spouse }]
-      : [],
-    children_below_18: Array.isArray(data.children_below_18) ? data.children_below_18 : [],
+    spouses,
+    children_below_18,
     assets: {
       ...base.assets,
       ...(data.assets || {}),
@@ -525,6 +545,120 @@ function DashboardPage() {
   useEffect(() => {
     dirtyRef.current = isDirty
   }, [isDirty])
+
+  const ownerOptions = useMemo(() => {
+    const options = []
+
+    ;(formData.spouses || []).forEach((spouse, index) => {
+      if (!spouse) {
+        return
+      }
+
+      const spouseId = typeof spouse.id === 'string' && spouse.id ? spouse.id : null
+      if (!spouseId) {
+        return
+      }
+
+      const last = String(spouse.last_name || '').trim()
+      const first = String(spouse.first_name || '').trim()
+      const mi = String(spouse.middle_initial || '').trim()
+
+      let name = ''
+      if (last && first) {
+        name = `${last}, ${first}`
+      } else {
+        name = last || first
+      }
+      if (mi) {
+        name = `${name}${name ? ' ' : ''}${mi}.`
+      }
+
+      options.push({
+        value: `spouse:${spouseId}`,
+        label: `Spouse: ${name || `Spouse #${index + 1}`}`,
+      })
+    })
+
+    ;(formData.children_below_18 || []).forEach((child, index) => {
+      if (!child) {
+        return
+      }
+
+      const childId = typeof child.id === 'string' && child.id ? child.id : null
+      if (!childId) {
+        return
+      }
+
+      const name = String(child.name || '').trim()
+      options.push({
+        value: `child:${childId}`,
+        label: `Child: ${name || `Child #${index + 1}`}`,
+      })
+    })
+
+    return options
+  }, [formData.spouses, formData.children_below_18])
+
+  const ownerOptionMap = useMemo(() => {
+    return new Map(ownerOptions.map((o) => [o.value, o.label]))
+  }, [ownerOptions])
+
+  function renderOwnerSelect(value, onChange) {
+    const selectedValue = value || ''
+    const isMissing = selectedValue !== '' && !ownerOptionMap.has(selectedValue)
+
+    return (
+      <div className="form-group">
+        <label>Owner (Spouse/Child)</label>
+        <select value={selectedValue} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Select</option>
+          {ownerOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+          {isMissing ? <option value={selectedValue}>(Removed)</option> : null}
+        </select>
+        {ownerOptions.length === 0 ? (
+          <p className="form-help">Add a spouse/child above to select an owner.</p>
+        ) : null}
+      </div>
+    )
+  }
+
+  function clearOwnerRefs(next, removedOwnerRef) {
+    if (!removedOwnerRef) {
+      return
+    }
+
+    const real = next.assets?.spouse_children?.real_properties || []
+    real.forEach((item) => {
+      if (item && item.owner_ref === removedOwnerRef) {
+        item.owner_ref = ''
+      }
+    })
+
+    const personal = next.assets?.spouse_children?.personal_properties || []
+    personal.forEach((item) => {
+      if (item && item.owner_ref === removedOwnerRef) {
+        item.owner_ref = ''
+      }
+    })
+
+    const liabilities = next.liabilities?.spouse_children || []
+    liabilities.forEach((item) => {
+      if (item && item.owner_ref === removedOwnerRef) {
+        item.owner_ref = ''
+      }
+    })
+
+    const businessEntries = next.business_interests?.spouse_children?.entries || []
+    businessEntries.forEach((item) => {
+      if (item && item.owner_ref === removedOwnerRef) {
+        item.owner_ref = ''
+      }
+    })
+  }
 
   useEffect(() => {
     setNumericFieldErrors((prev) => {
@@ -947,6 +1081,7 @@ function DashboardPage() {
   function addSpouse() {
     updateForm((next) => {
       next.spouses.push({
+        id: generateRowId('spouse'),
         is_public_official: false,
         last_name: '',
         first_name: '',
@@ -960,7 +1095,11 @@ function DashboardPage() {
 
   function removeSpouse(index) {
     updateForm((next) => {
+      const removedId = next.spouses[index]?.id
       next.spouses.splice(index, 1)
+      if (typeof removedId === 'string' && removedId) {
+        clearOwnerRefs(next, `spouse:${removedId}`)
+      }
     })
   }
 
@@ -968,6 +1107,7 @@ function DashboardPage() {
     updateForm((next) => {
       if (!next.spouses[index]) {
         next.spouses[index] = {
+          id: generateRowId('spouse'),
           is_public_official: false,
           last_name: '',
           first_name: '',
@@ -981,15 +1121,19 @@ function DashboardPage() {
     })
   }
 
-  function addItem(key, templateFactory) {
+  function addChild() {
     updateForm((next) => {
-      next[key].push(templateFactory())
+      next.children_below_18.push({ id: generateRowId('child'), name: '', age: '' })
     })
   }
 
-  function removeItem(key, index) {
+  function removeChild(index) {
     updateForm((next) => {
-      next[key].splice(index, 1)
+      const removedId = next.children_below_18[index]?.id
+      next.children_below_18.splice(index, 1)
+      if (typeof removedId === 'string' && removedId) {
+        clearOwnerRefs(next, `child:${removedId}`)
+      }
     })
   }
 
@@ -1019,12 +1163,18 @@ function DashboardPage() {
 
   function addBusinessEntry(bucket) {
     updateForm((next) => {
-      next.business_interests[bucket].entries.push({
+      const entry = {
         entity_name: '',
         business_address: '',
         nature_of_interest: '',
         date_acquired: '',
-      })
+      }
+
+      if (bucket === 'spouse_children') {
+        entry.owner_ref = ''
+      }
+
+      next.business_interests[bucket].entries.push(entry)
     })
   }
 
@@ -1523,7 +1673,7 @@ function DashboardPage() {
               </div>
             ) : null}
             {formData.spouses.map((spouse, idx) => (
-              <div className="repeater-item" key={`spouse-${idx}`}> 
+              <div className="repeater-item" key={spouse?.id || `spouse-${idx}`}> 
                 <button type="button" className="repeater-remove" onClick={() => removeSpouse(idx)}>
                   ×
                 </button>
@@ -1612,8 +1762,8 @@ function DashboardPage() {
           </div>
           <div className={`section-content ${openSections.children ? 'active' : ''}`}>
             {formData.children_below_18.map((child, index) => (
-              <div className="repeater-item" key={`child-${index}`}>
-                <button type="button" className="repeater-remove" onClick={() => removeItem('children_below_18', index)}>
+              <div className="repeater-item" key={child?.id || `child-${index}`}>
+                <button type="button" className="repeater-remove" onClick={() => removeChild(index)}>
                   ×
                 </button>
                 <div className="form-row">
@@ -1648,7 +1798,7 @@ function DashboardPage() {
             <button
               type="button"
               className="btn btn-add-item"
-              onClick={() => addItem('children_below_18', () => ({ name: '', age: '' }))}
+              onClick={addChild}
             >
               + Add Child
             </button>
@@ -1831,6 +1981,12 @@ function DashboardPage() {
                   ×
                 </button>
 
+                {renderOwnerSelect(item.owner_ref, (value) =>
+                  updateForm((next) => {
+                    next.assets.spouse_children.real_properties[index].owner_ref = value
+                  }),
+                )}
+
                 <div className="form-group">
                   <label>Description</label>
                   <input
@@ -1967,6 +2123,7 @@ function DashboardPage() {
               className="btn btn-add-item"
               onClick={() =>
                 addAssetItem('spouse_children', 'real_properties', () => ({
+                  owner_ref: '',
                   description: '',
                   kind: '',
                   exact_location: '',
@@ -2072,6 +2229,12 @@ function DashboardPage() {
                   ×
                 </button>
 
+                {renderOwnerSelect(item.owner_ref, (value) =>
+                  updateForm((next) => {
+                    next.assets.spouse_children.personal_properties[index].owner_ref = value
+                  }),
+                )}
+
                 <div className="form-group">
                   <label>Description</label>
                   <input
@@ -2122,6 +2285,7 @@ function DashboardPage() {
               className="btn btn-add-item"
               onClick={() =>
                 addAssetItem('spouse_children', 'personal_properties', () => ({
+                  owner_ref: '',
                   description: '',
                   acquisition_year: '',
                   acquisition_cost: '',
@@ -2211,6 +2375,12 @@ function DashboardPage() {
                   ×
                 </button>
 
+                {renderOwnerSelect(item.owner_ref, (value) =>
+                  updateForm((next) => {
+                    next.liabilities.spouse_children[index].owner_ref = value
+                  }),
+                )}
+
                 <div className="form-row-3">
                   <div className="form-group">
                     <label>Nature</label>
@@ -2257,7 +2427,7 @@ function DashboardPage() {
               type="button"
               className="btn btn-add-item"
               onClick={() =>
-                addLiabilityItem('spouse_children', () => ({ nature: '', creditor_name: '', outstanding_balance: '' }))
+                addLiabilityItem('spouse_children', () => ({ owner_ref: '', nature: '', creditor_name: '', outstanding_balance: '' }))
               }
             >
               + Add Spouse/Children Liability
@@ -2397,6 +2567,12 @@ function DashboardPage() {
                     >
                       ×
                     </button>
+
+                    {renderOwnerSelect(item.owner_ref, (value) =>
+                      updateForm((next) => {
+                        next.business_interests.spouse_children.entries[index].owner_ref = value
+                      }),
+                    )}
 
                     <div className="form-group">
                       <label>Entity Name</label>
