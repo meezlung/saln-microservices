@@ -47,8 +47,10 @@ final class PdfFormMapper
     {
         if ($amount === '') return '';
         $fmt = new NumberFormatter('en_PH', NumberFormatter::CURRENCY);
-        $fmt->setSymbol(NumberFormatter::CURRENCY_SYMBOL, '₱');
-        return  $fmt->formatCurrency((float)$amount, 'PHP'); 
+        $fmt->setTextAttribute(NumberFormatter::CURRENCY_CODE, 'PHP');
+        $fmt->setSymbol(NumberFormatter::CURRENCY_SYMBOL, 'PHP ');
+        return $fmt->formatCurrency((float)$amount, 'PHP'); 
+        
     }
 
     public static function mapA(array $form, string $page_count): array
