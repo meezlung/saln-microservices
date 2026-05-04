@@ -57,16 +57,16 @@ final class PdfFormMapper
         $spouse = $form['spouses'][0] ?? $form['spouse'] ?? [];
         $additional_spouses =  $form['additional_spouses'] ?? array_slice($form['spouses'] ?? [], 1) ?? [];
         $children = $form['children_below_18'] ?? $form['children'] ?? [];
-        $real_properties = $form['assets']['real_properties'] ?? $form['real_properties'] ?? [];
-        $personal_properties = $form['assets']['personal_properties'] ?? $form['personal_properties'] ?? [];
+        $real_properties = $form['assets']['declarant']['real_properties'] ?? $form['real_properties'] ?? [];
+        $personal_properties = $form['assets']['declarant']['personal_properties'] ?? $form['personal_properties'] ?? [];
         
-        $temp = $form['business_interests'] ?? ['has_business_interest' => false, 'entries' => []];
+        $temp = $form['business_interests']['declarant'] ?? ['has_business_interest' => false, 'entries' => []];
         $business_interests = $temp['entries'] ?? $form['business_interests'] ?? [];
         
         $temp2 = $form['relatives_in_government'] ?? ['has_relatives' => false, 'entries' => []];
         $rel_in_govt_service = $temp2 ?? $form['relatives_in_government_service'] ?? [];
         
-        $liabilities = $form['liabilities'] ?? [];
+        $liabilities = $form['liabilities']['declarant'] ?? [];
 
         [$decAddr1, $decAddr2] = self::addressLines($declarant['office_address'] ?? '');
         [$spAddr1, $spAddr2]   = self::addressLines($spouse['office_address']?? '');
@@ -258,11 +258,11 @@ final class PdfFormMapper
     public static function mapB(array $form, string $page_count, string $page_num): array
     {
         $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
-        $real_properties = $form['assets']['real_properties'] ?? $form['real_properties'] ?? [];
-        $personal_properties = $form['assets']['personal_properties'] ?? $form['personal_properties'] ?? [];
-        $temp = $form['business_interests'] ?? ['has_business_interest' => false, 'entries' => []] ?? [];
+        $real_properties = $form['assets']['declarant']['real_properties'] ?? $form['real_properties'] ?? [];
+        $personal_properties = $form['assets']['declarant']['personal_properties'] ?? $form['personal_properties'] ?? [];
+        $temp = $form['business_interests']['declarant'] ?? ['has_business_interest' => false, 'entries' => []] ?? [];
         $business_interests = $temp['entries'] ?? $form['business_interests'] ?? [];
-        $liabilities = $form['liabilities'] ?? [];
+        $liabilities = $form['liabilities']['declarant'] ?? [];
 
         $pdf = [
             // declarant
@@ -364,18 +364,18 @@ final class PdfFormMapper
 
     public static function mapC(array $form, string $page_count, string $page_num): array
     {
-        $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
-        $real_properties = $form['assets']['real_properties'] ?? $form['real_properties'] ?? [];
-        $personal_properties = $form['assets']['personal_properties'] ?? $form['personal_properties'] ?? [];
-        $temp = $form['business_interests'] ?? ['has_business_interest' => false, 'entries' => []] ?? [];
+       $declarant = $form['declarant']['personal_information'] ?? $form['declarant']?? [];
+        $real_properties = $form['assets']['spouse_children']['real_properties'] ?? $form['real_properties'] ?? [];
+        $personal_properties = $form['assets']['spouse_children']['personal_properties'] ?? $form['personal_properties'] ?? [];
+        $temp = $form['business_interests']['spouse_children'] ?? ['has_business_interest' => false, 'entries' => []] ?? [];
         $business_interests = $temp['entries'] ?? $form['business_interests'] ?? [];
-        $liabilities = $form['liabilities'] ?? [];
+        $liabilities = $form['liabilities']['spouse_children'] ?? [];
 
         $pdf = [
             // declarant
             'family_name'      => $declarant['family_name'] ?? $declarant['last_name'] ?? '',
             'first_name'       => $declarant['first_name'] ?? '',
-            'family_name_2'    => $declarant['middle_initial'] ?? '',
+            'middle_initial'    => $declarant['middle_initial'] ?? '',
             'position'         => $declarant['position'] ?? '',
             'agency_office'    => $declarant['agency_office'] ?? '',
             'as_of'            => new DateTime('last year december 31')->format('F j, Y'),
