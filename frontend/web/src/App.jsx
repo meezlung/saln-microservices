@@ -504,19 +504,20 @@ function DashboardPage() {
   const location = useLocation()
   const importFileRef = useRef(null)
   const dashboardFormRef = useRef(null)
+  const sidebarToggleRef = useRef(null)
+  const sidebarMenuRef = useRef(null)
   const [user] = useState(() => getCurrentUser())
   const [formData, setFormData] = useState(createEmptyForm())
+  const [currentTab, setCurrentTab] = useState('formInfo')
   const [openSections, setOpenSections] = useState({
-    formInfo: true,
-    personal: true,
-    spouse: false,
-    children: false,
+    personalFamily: true,
+    assetsLiabilities: true,
+    personalInfo: true,
+    spouseInfo: false,
+    childrenInfo: false,
     realProperties: false,
     personalProperties: false,
     liabilities: false,
-    business: false,
-    relatives: false,
-    certification: false,
   })
   const [statusText, setStatusText] = useState('Draft')
   const [statusSaved, setStatusSaved] = useState(false)
@@ -529,6 +530,7 @@ function DashboardPage() {
   const [previewUrl, setPreviewUrl] = useState('')
   const [downloadUrl, setDownloadUrl] = useState('')
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+  const [sidebarRadialOpen, setSidebarRadialOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [sectionEmptyCounts, setSectionEmptyCounts] = useState({})
@@ -538,6 +540,15 @@ function DashboardPage() {
   const formDataRef = useRef(formData)
   const dirtyRef = useRef(isDirty)
 
+  const majorTabs = [
+    { value: 'formInfo', label: 'Form Information', icon: '📄' },
+    { value: 'personalFamily', label: 'Personal & Family Information', icon: '👪' },
+    { value: 'assetsLiabilities', label: 'Assets, Liabilities & Net Worth', icon: '💼' },
+    { value: 'business', label: 'Business Interests & Financial Connections', icon: '📊' },
+    { value: 'relatives', label: 'Relatives in Government Service', icon: '🏛️' },
+    { value: 'certification', label: 'Certification', icon: '✅' },
+  ]
+
   useEffect(() => {
     formDataRef.current = formData
   }, [formData])
@@ -545,6 +556,36 @@ function DashboardPage() {
   useEffect(() => {
     dirtyRef.current = isDirty
   }, [isDirty])
+
+  useEffect(() => {
+    if (!sidebarRadialOpen) {
+      return undefined
+    }
+
+    function handlePointerDown(event) {
+      const target = event.target
+
+      if (sidebarToggleRef.current?.contains(target) || sidebarMenuRef.current?.contains(target)) {
+        return
+      }
+
+      setSidebarRadialOpen(false)
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setSidebarRadialOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [sidebarRadialOpen])
 
   const ownerOptions = useMemo(() => {
     const options = []
@@ -602,7 +643,6 @@ function DashboardPage() {
   const ownerOptionMap = useMemo(() => {
     return new Map(ownerOptions.map((o) => [o.value, o.label]))
   }, [ownerOptions])
-
   function renderOwnerSelect(value, onChange) {
     const selectedValue = value || ''
     const isMissing = selectedValue !== '' && !ownerOptionMap.has(selectedValue)
@@ -931,14 +971,22 @@ function DashboardPage() {
   }, [formData, openSections, loading])
 
   function renderSectionStatus(sectionKey) {
+    const sectionAliases = {
+      personal: 'personalInfo',
+      spouse: 'spouseInfo',
+      children: 'childrenInfo',
+    }
+
+    const normalizedSectionKey = sectionAliases[sectionKey] || sectionKey
+
     // Special case: Certification section requires checkbox to be checked
-    if (sectionKey === 'certification') {
+    if (normalizedSectionKey === 'certification') {
       if (!formData.certification?.authorization_to_verify) {
         return <span className="section-status incomplete">1 empty</span>
       }
       return <span className="section-status complete">Complete</span>
     }
-    const emptyCount = sectionEmptyCounts[sectionKey] ?? 0
+    const emptyCount = sectionEmptyCounts[normalizedSectionKey] ?? 0
 
     if (emptyCount === 0) {
       return <span className="section-status complete">Complete</span>
@@ -1117,6 +1165,13 @@ function DashboardPage() {
           office_address: '',
         }
       }
+
+      if (field === 'is_public_official' && !value) {
+        next.spouses[index].position = ''
+        next.spouses[index].agency_office = ''
+        next.spouses[index].office_address = ''
+      }
+
       next.spouses[index][field] = value
     })
   }
@@ -1360,6 +1415,10 @@ function DashboardPage() {
     }))
   }
 
+  function toggleTab(tabKey) {
+    setCurrentTab(tabKey)
+  }
+
   async function handleLogout() {
     try {
       await authApi.logout()
@@ -1384,7 +1443,7 @@ function DashboardPage() {
   const liabilitiesOutstandingTotal = allLiabilities.reduce((sum, item) => sum + Number(item.outstanding_balance || 0), 0)
 
   return (
-    <>
+    <div className="dashboard-page">
       {showInactivityModal ? (
         <div className="modal active">
           <div className="modal-content">
@@ -1500,1296 +1559,1383 @@ function DashboardPage() {
         </div>
       </nav>
 
-      <div className="container" style={{ paddingTop: '32px', paddingBottom: '80px' }} ref={dashboardFormRef}>
-        {notice ? <div className={`alert alert-${noticeType === 'error' ? 'error' : noticeType === 'success' ? 'success' : 'info'}`}>{notice}</div> : null}
+      <div className="dashboard-shell" ref={dashboardFormRef}>
+        <aside className="sidebar sidebar-launcher">
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: 'none' }}
+            onChange={handleImportFile}
+          />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-          <h2 style={{ margin: 0 }}>SALN Form 2025</h2>
-          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-            <strong>Last saved:</strong> {lastSavedAt}
-          </p>
-        </div>
+          <button
+            ref={sidebarToggleRef}
+            type="button"
+            className="theme-toggle sidebar-toggle"
+            onClick={() => setSidebarRadialOpen((open) => !open)}
+            aria-label={sidebarRadialOpen ? 'Close tab menu' : 'Open tab menu'}
+            aria-expanded={sidebarRadialOpen}
+            title={sidebarRadialOpen ? 'Close tab menu' : 'Open tab menu'}
+          >
+            {sidebarRadialOpen ? '×' : '☰'}
+          </button>
 
-        <p className="form-help" style={{ marginBottom: '20px' }}>
-          Empty fields are highlighted so you can quickly spot unfinished items.
-        </p>
-
-        <div className="form-section" data-section="formInfo">
-          <div className="section-header" onClick={() => toggleSection('formInfo')}>
-            <div className="section-header-main">
-              <h3>Form Information</h3>
-              {renderSectionStatus('formInfo')}
-            </div>
-            <span className="section-toggle">{openSections.formInfo ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.formInfo ? 'active' : ''}`}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Compliance Type</label>
-                <select
-                  value={formData.form_metadata?.compliance_type || ''}
-                  onChange={(e) => setMetaField('compliance_type', e.target.value)}
+          <div
+            ref={sidebarMenuRef}
+            className={`sidebar-menu ${sidebarRadialOpen ? 'open' : ''}`}
+            aria-hidden={!sidebarRadialOpen}
+          >
+            {majorTabs.map((tab, index) => {
+              const angle = -90 + index * (360 / majorTabs.length)
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  className={`btn sidebar-radial-item ${currentTab === tab.value ? 'active' : ''}`}
+                  onClick={() => {
+                    toggleTab(tab.value)
+                    setSidebarRadialOpen(false)
+                  }}
+                  style={{ '--radial-angle': `${angle}deg` }}
                 >
-                  <option value="">Select</option>
-                  <option value="ASSUMPTION">Assumption</option>
-                  <option value="ANNUAL">Annual</option>
-                  <option value="EXIT">Exit</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>As of Date</label>
-                <input
-                  type="date"
-                  value={formData.form_metadata?.as_of_date || ''}
-                  onChange={(e) => setMetaField('as_of_date', e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Filing Type</label>
-                <select
-                  value={formData.form_metadata?.filing_type || ''}
-                  onChange={(e) => setMetaField('filing_type', e.target.value)}
-                >
-                  <option value="">Select</option>
-                  <option value="JOINT">Joint</option>
-                  <option value="SEPARATE">Separate</option>
-                  <option value="NOT_APPLICABLE">Not Applicable</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section" data-section="personal">
-          <div className="section-header" onClick={() => toggleSection('personal')}>
-            <div className="section-header-main">
-              <h3>Personal Information</h3>
-              {renderSectionStatus('personal')}
-            </div>
-            <span className="section-toggle">{openSections.personal ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.personal ? 'active' : ''}`}>
-            <div className="form-row-3">
-              <div className="form-group">
-                <label>Last Name</label>
-                <input
-                  type="text"
-                  value={formData.declarant?.personal_information?.last_name || ''}
-                  onChange={(e) => setPersonalField('last_name', e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>First Name</label>
-                <input
-                  type="text"
-                  value={formData.declarant?.personal_information?.first_name || ''}
-                  onChange={(e) => setPersonalField('first_name', e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Middle Initial</label>
-                <input
-                  type="text"
-                  value={formData.declarant?.personal_information?.middle_initial || ''}
-                  onChange={(e) => setPersonalField('middle_initial', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Position</label>
-              <input
-                type="text"
-                value={formData.declarant?.personal_information?.position || ''}
-                onChange={(e) => setPersonalField('position', e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Agency/Office</label>
-              <input
-                type="text"
-                value={formData.declarant?.personal_information?.agency_office || ''}
-                onChange={(e) => setPersonalField('agency_office', e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Office Address</label>
-              <textarea
-                rows={2}
-                value={formData.declarant?.personal_information?.office_address || ''}
-                onChange={(e) => setPersonalField('office_address', e.target.value)}
-              />
-            </div>
-
-            <h4 style={{ marginTop: '24px', marginBottom: '16px' }}>Government ID</h4>
-            <div className="form-row">
-              <div className="form-group">
-                <label>ID Type</label>
-                <input
-                  type="text"
-                  value={formData.declarant?.personal_information?.government_id?.type || ''}
-                  onChange={(e) => setGovIdField('type', e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>ID Number</label>
-                <input
-                  type="text"
-                  value={formData.declarant?.personal_information?.government_id?.id_number || ''}
-                  onChange={(e) => setGovIdField('id_number', e.target.value)}
-                  inputMode="numeric"
-                  aria-invalid={!!govIdNumberError}
-                />
-                {govIdNumberError ? <p className="error">{govIdNumberError}</p> : null}
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Date Issued</label>
-              <input
-                type="date"
-                value={formData.declarant?.personal_information?.government_id?.date_issued || ''}
-                onChange={(e) => setGovIdField('date_issued', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section" data-section="spouse">
-          <div className="section-header" onClick={() => toggleSection('spouse')}>
-            <div className="section-header-main">
-              <h3>Spouse Information</h3>
-              {renderSectionStatus('spouse')}
-            </div>
-            <span className="section-toggle">{openSections.spouse ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.spouse ? 'active' : ''}`}> 
-            {formData.spouses.length === 0 ? (
-              <div className="form-group">
-                <label>No spouse added.</label>
-              </div>
-            ) : null}
-            {formData.spouses.map((spouse, idx) => (
-              <div className="repeater-item" key={spouse?.id || `spouse-${idx}`}> 
-                <button type="button" className="repeater-remove" onClick={() => removeSpouse(idx)}>
-                  ×
+                  {tab.label}
                 </button>
-                <div className="form-row-3">
+              )
+            })}
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="dashboard-main" style={{ flex: 1, minWidth: 0 }}>
+          {notice ? <div className={`alert alert-${noticeType === 'error' ? 'error' : noticeType === 'success' ? 'success' : 'info'}`}>{notice}</div> : null}
+
+          <div
+            className="dashboard-header-row"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}
+          >
+            <div className="dashboard-header-left">
+              <h2 style={{ margin: 0 }}>SALN Form 2025</h2>
+            </div>
+            <div className="dashboard-header-right" style={{ justifyContent: 'flex-start' }}>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                <strong>Last saved:</strong> {lastSavedAt}
+              </p>
+            </div>
+          </div>
+
+          <p className="form-help" style={{ marginBottom: '20px' }}>
+            Empty fields are highlighted so you can quickly spot unfinished items.
+          </p>
+
+          {/* Form Information Tab */}
+          {currentTab === 'formInfo' && (
+            <div className="form-section" data-section="formInfo">
+              <div className="section-header" style={{ cursor: 'default' }}>
+                <div className="section-header-main">
+                  <h3>Form Information</h3>
+                  {renderSectionStatus('formInfo')}
+                </div>
+              </div>
+              <div className="section-content active">
+                <div className="form-row">
                   <div className="form-group">
-                    <label>Last Name</label>
-                    <input
-                      type="text"
-                      value={spouse.last_name || ''}
-                      onChange={(e) => setSpouseField(idx, 'last_name', e.target.value)}
-                    />
+                    <label>Compliance Type</label>
+                    <select
+                      value={formData.form_metadata?.compliance_type || ''}
+                      onChange={(e) => setMetaField('compliance_type', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="ASSUMPTION">Assumption</option>
+                      <option value="ANNUAL">Annual</option>
+                      <option value="EXIT">Exit</option>
+                    </select>
                   </div>
                   <div className="form-group">
-                    <label>First Name</label>
+                    <label>As of Date</label>
                     <input
-                      type="text"
-                      value={spouse.first_name || ''}
-                      onChange={(e) => setSpouseField(idx, 'first_name', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Middle Initial</label>
-                    <input
-                      type="text"
-                      value={spouse.middle_initial || ''}
-                      onChange={(e) => setSpouseField(idx, 'middle_initial', e.target.value)}
+                      type="date"
+                      value={formData.form_metadata?.as_of_date || ''}
+                      onChange={(e) => setMetaField('as_of_date', e.target.value)}
                     />
                   </div>
                 </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Filing Type</label>
+                    <select
+                      value={formData.form_metadata?.filing_type || ''}
+                      onChange={(e) => setMetaField('filing_type', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="JOINT">Joint</option>
+                      <option value="SEPARATE">Separate</option>
+                      <option value="NOT_APPLICABLE">Not Applicable</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
+          {/* Personal & Family Information Tab */}
+          {currentTab === 'personalFamily' && (
+            <>
+              {/* Personal Information Section */}
+              <div className="form-section" data-section="personalInfo">
+                <div className="section-header" onClick={() => toggleSection('personalInfo')} style={{ cursor: 'pointer' }}>
+                  <div className="section-header-main">
+                    <h3>Personal Information</h3>
+                    {renderSectionStatus('personalInfo')}
+                  </div>
+                  <span className="section-toggle">{openSections.personalInfo ? '−' : '+'}</span>
+                </div>
+                <div className={`section-content ${openSections.personalInfo ? 'active' : ''}`}>
+                  <div className="form-row-3">
+                    <div className="form-group">
+                      <label>Last Name</label>
+                      <input
+                        type="text"
+                        value={formData.declarant?.personal_information?.last_name || ''}
+                        onChange={(e) => setPersonalField('last_name', e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>First Name</label>
+                      <input
+                        type="text"
+                        value={formData.declarant?.personal_information?.first_name || ''}
+                        onChange={(e) => setPersonalField('first_name', e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Middle Initial</label>
+                      <input
+                        type="text"
+                        value={formData.declarant?.personal_information?.middle_initial || ''}
+                        onChange={(e) => setPersonalField('middle_initial', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Position</label>
+                    <input
+                      type="text"
+                      value={formData.declarant?.personal_information?.position || ''}
+                      onChange={(e) => setPersonalField('position', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Agency/Office</label>
+                    <input
+                      type="text"
+                      value={formData.declarant?.personal_information?.agency_office || ''}
+                      onChange={(e) => setPersonalField('agency_office', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Office Address</label>
+                    <textarea
+                      rows={2}
+                      value={formData.declarant?.personal_information?.office_address || ''}
+                      onChange={(e) => setPersonalField('office_address', e.target.value)}
+                    />
+                  </div>
+
+                  <h4 style={{ marginTop: '24px', marginBottom: '16px' }}>Government ID</h4>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>ID Type</label>
+                      <input
+                        type="text"
+                        value={formData.declarant?.personal_information?.government_id?.type || ''}
+                        onChange={(e) => setGovIdField('type', e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>ID Number</label>
+                      <input
+                        type="text"
+                        value={formData.declarant?.personal_information?.government_id?.id_number || ''}
+                        onChange={(e) => setGovIdField('id_number', e.target.value)}
+                        inputMode="numeric"
+                        aria-invalid={!!govIdNumberError}
+                      />
+                      {govIdNumberError ? <p className="error">{govIdNumberError}</p> : null}
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Date Issued</label>
+                    <input
+                      type="date"
+                      value={formData.declarant?.personal_information?.government_id?.date_issued || ''}
+                      onChange={(e) => setGovIdField('date_issued', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Spouse Information Section */}
+              <div className="form-section" data-section="spouseInfo">
+                <div className="section-header" onClick={() => toggleSection('spouseInfo')} style={{ cursor: 'pointer' }}>
+                  <div className="section-header-main">
+                    <h3>Spouse Information</h3>
+                    {renderSectionStatus('spouseInfo')}
+                  </div>
+                  <span className="section-toggle">{openSections.spouseInfo ? '−' : '+'}</span>
+                </div>
+                <div className={`section-content ${openSections.spouseInfo ? 'active' : ''}`}> 
+                  {formData.spouses.length === 0 ? (
+                    <div className="form-group">
+                      <label>No spouse added.</label>
+                    </div>
+                  ) : null}
+                  {formData.spouses.map((spouse, idx) => (
+                    <div className="repeater-item" key={spouse?.id || `spouse-${idx}`}> 
+                      <button type="button" className="repeater-remove" onClick={() => removeSpouse(idx)}>
+                        ×
+                      </button>
+                      <div className="form-row-3">
+                        <div className="form-group">
+                          <label>Last Name</label>
+                          <input
+                            type="text"
+                            value={spouse.last_name || ''}
+                            onChange={(e) => setSpouseField(idx, 'last_name', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>First Name</label>
+                          <input
+                            type="text"
+                            value={spouse.first_name || ''}
+                            onChange={(e) => setSpouseField(idx, 'first_name', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Middle Initial</label>
+                          <input
+                            type="text"
+                            value={spouse.middle_initial || ''}
+                            onChange={(e) => setSpouseField(idx, 'middle_initial', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={!!spouse.is_public_official}
+                            onChange={(e) => setSpouseField(idx, 'is_public_official', e.target.checked)}
+                          />{' '}
+                          Is a public official
+                        </label>
+                      </div>
+
+                      {spouse.is_public_official ? (
+                        <>
+                          <div className="form-group">
+                            <label>Position</label>
+                            <input
+                              type="text"
+                              value={spouse.position || ''}
+                              onChange={(e) => setSpouseField(idx, 'position', e.target.value)}
+                            />
+                          </div>
+
+                          <div className="form-group">
+                            <label>Agency/Office</label>
+                            <input
+                              type="text"
+                              value={spouse.agency_office || ''}
+                              onChange={(e) => setSpouseField(idx, 'agency_office', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Office Address</label>
+                            <input
+                              type="text"
+                              value={spouse.office_address || ''}
+                              onChange={(e) => setSpouseField(idx, 'office_address', e.target.value)}
+                            />
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={addSpouse}
+                  >
+                    + Add Spouse
+                  </button>
+                </div>
+              </div>
+
+              {/* Children Information Section */}
+              <div className="form-section" data-section="childrenInfo">
+                <div className="section-header" onClick={() => toggleSection('childrenInfo')} style={{ cursor: 'pointer' }}>
+                  <div className="section-header-main">
+                    <h3>Children Below 18</h3>
+                    {renderSectionStatus('childrenInfo')}
+                  </div>
+                  <span className="section-toggle">{openSections.childrenInfo ? '−' : '+'}</span>
+                </div>
+                <div className={`section-content ${openSections.childrenInfo ? 'active' : ''}`}>
+                  {formData.children_below_18.map((child, index) => (
+                    <div className="repeater-item" key={child?.id || `child-${index}`}>
+                      <button type="button" className="repeater-remove" onClick={() => removeChild(index)}>
+                        ×
+                      </button>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Name</label>
+                          <input
+                            type="text"
+                            value={child.name || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.children_below_18[index].name = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Age</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={child.age || ''}
+                            onChange={(e) => setChildAgeField(index, e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`children_below_18.${index}.age`]}
+                          />
+                          {numericFieldErrors[`children_below_18.${index}.age`] ? (
+                            <p className="error">{numericFieldErrors[`children_below_18.${index}.age`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={addChild}
+                  >
+                    + Add Child
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Assets, Liabilities & Net Worth Tab */}
+          {currentTab === 'assetsLiabilities' && (
+            <>
+              {/* Real Properties Section */}
+              <div className="form-section" data-section="realProperties">
+                <div className="section-header" onClick={() => toggleSection('realProperties')} style={{ cursor: 'pointer' }}>
+                  <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0 }}>Real Properties</h3>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>
+                      Total Assessed: PHP {formatCurrency(realPropertiesAssessedTotal)} | Total FMV: PHP {formatCurrency(realPropertiesFairMarketTotal)}
+                    </span>
+                    {renderSectionStatus('realProperties')}
+                  </div>
+                  <span className="section-toggle">{openSections.realProperties ? '−' : '+'}</span>
+                </div>
+                <div className={`section-content ${openSections.realProperties ? 'active' : ''}`}>
+                  <h4 style={{ marginTop: 0 }}>Declarant</h4>
+                  {formData.assets.declarant.real_properties.map((item, index) => (
+                    <div className="repeater-item" key={`real-declarant-${index}`}>
+                      <button
+                        type="button"
+                        className="repeater-remove"
+                        onClick={() => removeAssetItem('declarant', 'real_properties', index)}
+                      >
+                        ×
+                      </button>
+
+                      <div className="form-group">
+                        <label>Description</label>
+                        <input
+                          type="text"
+                          value={item.description || ''}
+                          onChange={(e) =>
+                            updateForm((next) => {
+                              next.assets.declarant.real_properties[index].description = e.target.value
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Kind</label>
+                          <select
+                            value={item.kind || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.declarant.real_properties[index].kind = e.target.value
+                              })
+                            }
+                          >
+                            <option value="">Select</option>
+                            <option value="RESIDENTIAL">Residential</option>
+                            <option value="COMMERCIAL">Commercial</option>
+                            <option value="INDUSTRIAL">Industrial</option>
+                            <option value="AGRICULTURAL">Agricultural</option>
+                            <option value="MIXED_USE">Mixed Use</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Location</label>
+                          <input
+                            type="text"
+                            value={item.exact_location || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.declarant.real_properties[index].exact_location = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Assessed Value (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.assessed_value || ''}
+                            onChange={(e) => setRealPropertyValueField('declarant', index, 'assessed_value', e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`]}
+                          />
+                          {numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`] ? (
+                            <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`]}</p>
+                          ) : null}
+                        </div>
+                        <div className="form-group">
+                          <label>Fair Market Value (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.fair_market_value || ''}
+                            onChange={(e) => setRealPropertyValueField('declarant', index, 'fair_market_value', e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`]}
+                          />
+                          {numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`] ? (
+                            <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <h4 style={{ marginTop: '16px' }}>Acquisition</h4>
+                      <div className="form-row-3">
+                        <div className="form-group">
+                          <label>Year</label>
+                          <input
+                            type="number"
+                            min={1900}
+                            max={2100}
+                            value={item.acquisition?.year || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.declarant.real_properties[index].acquisition.year = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Mode</label>
+                          <select
+                            value={item.acquisition?.mode || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.declarant.real_properties[index].acquisition.mode = e.target.value
+                              })
+                            }
+                          >
+                            <option value="">Select</option>
+                            <option value="PURCHASE">Purchase</option>
+                            <option value="INHERITANCE">Inheritance</option>
+                            <option value="DONATION">Donation</option>
+                            <option value="OTHER">Other</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Cost (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.acquisition?.cost || ''}
+                            onChange={(e) => setRealPropertyValueField('declarant', index, 'acquisition.cost', e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`]}
+                          />
+                          {numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`] ? (
+                            <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={() =>
+                      addAssetItem('declarant', 'real_properties', () => ({
+                        description: '',
+                        kind: '',
+                        exact_location: '',
+                        assessed_value: '',
+                        fair_market_value: '',
+                        acquisition: { year: '', mode: '', cost: '' },
+                      }))
+                    }
+                  >
+                    + Add Declarant Real Property
+                  </button>
+
+                  <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
+                  {formData.assets.spouse_children.real_properties.map((item, index) => (
+                    <div className="repeater-item" key={`real-spouse_children-${index}`}>
+                      <button
+                        type="button"
+                        className="repeater-remove"
+                        onClick={() => removeAssetItem('spouse_children', 'real_properties', index)}
+                      >
+                        ×
+                      </button>
+
+                      {renderOwnerSelect(item.owner_ref, (value) =>
+                        updateForm((next) => {
+                          next.assets.spouse_children.real_properties[index].owner_ref = value
+                        }),
+                      )}
+
+                      <div className="form-group">
+                        <label>Description</label>
+                        <input
+                          type="text"
+                          value={item.description || ''}
+                          onChange={(e) =>
+                            updateForm((next) => {
+                              next.assets.spouse_children.real_properties[index].description = e.target.value
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Kind</label>
+                          <select
+                            value={item.kind || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.spouse_children.real_properties[index].kind = e.target.value
+                              })
+                            }
+                          >
+                            <option value="">Select</option>
+                            <option value="RESIDENTIAL">Residential</option>
+                            <option value="COMMERCIAL">Commercial</option>
+                            <option value="INDUSTRIAL">Industrial</option>
+                            <option value="AGRICULTURAL">Agricultural</option>
+                            <option value="MIXED_USE">Mixed Use</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Location</label>
+                          <input
+                            type="text"
+                            value={item.exact_location || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.spouse_children.real_properties[index].exact_location = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Assessed Value (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.assessed_value || ''}
+                            onChange={(e) =>
+                              setRealPropertyValueField('spouse_children', index, 'assessed_value', e.target.value)
+                            }
+                            aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`]}
+                          />
+                          {numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`] ? (
+                            <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`]}</p>
+                          ) : null}
+                        </div>
+                        <div className="form-group">
+                          <label>Fair Market Value (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.fair_market_value || ''}
+                            onChange={(e) =>
+                              setRealPropertyValueField('spouse_children', index, 'fair_market_value', e.target.value)
+                            }
+                            aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`]}
+                          />
+                          {numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`] ? (
+                            <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <h4 style={{ marginTop: '16px' }}>Acquisition</h4>
+                      <div className="form-row-3">
+                        <div className="form-group">
+                          <label>Year</label>
+                          <input
+                            type="number"
+                            min={1900}
+                            max={2100}
+                            value={item.acquisition?.year || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.spouse_children.real_properties[index].acquisition.year = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Mode</label>
+                          <select
+                            value={item.acquisition?.mode || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.spouse_children.real_properties[index].acquisition.mode = e.target.value
+                              })
+                            }
+                          >
+                            <option value="">Select</option>
+                            <option value="PURCHASE">Purchase</option>
+                            <option value="INHERITANCE">Inheritance</option>
+                            <option value="DONATION">Donation</option>
+                            <option value="OTHER">Other</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Cost (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.acquisition?.cost || ''}
+                            onChange={(e) =>
+                              setRealPropertyValueField('spouse_children', index, 'acquisition.cost', e.target.value)
+                            }
+                            aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`]}
+                          />
+                          {numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`] ? (
+                            <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={() =>
+                      addAssetItem('spouse_children', 'real_properties', () => ({
+                        owner_ref: '',
+                        description: '',
+                        kind: '',
+                        exact_location: '',
+                        assessed_value: '',
+                        fair_market_value: '',
+                        acquisition: { year: '', mode: '', cost: '' },
+                      }))
+                    }
+                  >
+                    + Add Spouse/Children Real Property
+                  </button>
+                </div>
+              </div>
+
+              {/* Personal Properties Section */}
+              <div className="form-section" data-section="personalProperties">
+                <div className="section-header" onClick={() => toggleSection('personalProperties')} style={{ cursor: 'pointer' }}>
+                  <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0 }}>Personal Properties</h3>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>Total: PHP {formatCurrency(personalPropertiesTotal)}</span>
+                    {renderSectionStatus('personalProperties')}
+                  </div>
+                  <span className="section-toggle">{openSections.personalProperties ? '−' : '+'}</span>
+                </div>
+                <div className={`section-content ${openSections.personalProperties ? 'active' : ''}`}>
+                  <h4 style={{ marginTop: 0 }}>Declarant</h4>
+                  {formData.assets.declarant.personal_properties.map((item, index) => (
+                    <div className="repeater-item" key={`personal-declarant-${index}`}>
+                      <button
+                        type="button"
+                        className="repeater-remove"
+                        onClick={() => removeAssetItem('declarant', 'personal_properties', index)}
+                      >
+                        ×
+                      </button>
+
+                      <div className="form-group">
+                        <label>Description</label>
+                        <input
+                          type="text"
+                          value={item.description || ''}
+                          onChange={(e) =>
+                            updateForm((next) => {
+                              next.assets.declarant.personal_properties[index].description = e.target.value
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Year Acquired</label>
+                          <input
+                            type="number"
+                            min={1900}
+                            max={2100}
+                            value={item.acquisition_year || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.declarant.personal_properties[index].acquisition_year = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Acquisition Cost (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.acquisition_cost || ''}
+                            onChange={(e) => setPersonalPropertyCostField('declarant', index, e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`]}
+                          />
+                          {numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`] ? (
+                            <p className="error">{numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={() =>
+                      addAssetItem('declarant', 'personal_properties', () => ({
+                        description: '',
+                        acquisition_year: '',
+                        acquisition_cost: '',
+                      }))
+                    }
+                  >
+                    + Add Declarant Personal Property
+                  </button>
+
+                  <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
+                  {formData.assets.spouse_children.personal_properties.map((item, index) => (
+                    <div className="repeater-item" key={`personal-spouse_children-${index}`}>
+                      <button
+                        type="button"
+                        className="repeater-remove"
+                        onClick={() => removeAssetItem('spouse_children', 'personal_properties', index)}
+                      >
+                        ×
+                      </button>
+
+                      {renderOwnerSelect(item.owner_ref, (value) =>
+                        updateForm((next) => {
+                          next.assets.spouse_children.personal_properties[index].owner_ref = value
+                        }),
+                      )}
+
+                      <div className="form-group">
+                        <label>Description</label>
+                        <input
+                          type="text"
+                          value={item.description || ''}
+                          onChange={(e) =>
+                            updateForm((next) => {
+                              next.assets.spouse_children.personal_properties[index].description = e.target.value
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Year Acquired</label>
+                          <input
+                            type="number"
+                            min={1900}
+                            max={2100}
+                            value={item.acquisition_year || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.assets.spouse_children.personal_properties[index].acquisition_year = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Acquisition Cost (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.acquisition_cost || ''}
+                            onChange={(e) => setPersonalPropertyCostField('spouse_children', index, e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`]}
+                          />
+                          {numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`] ? (
+                            <p className="error">{numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={() =>
+                      addAssetItem('spouse_children', 'personal_properties', () => ({
+                        owner_ref: '',
+                        description: '',
+                        acquisition_year: '',
+                        acquisition_cost: '',
+                      }))
+                    }
+                  >
+                    + Add Spouse/Children Personal Property
+                  </button>
+                </div>
+              </div>
+
+              {/* Liabilities Section */}
+              <div className="form-section" data-section="liabilities">
+                <div className="section-header" onClick={() => toggleSection('liabilities')} style={{ cursor: 'pointer' }}>
+                  <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0 }}>Liabilities</h3>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>Total: PHP {formatCurrency(liabilitiesOutstandingTotal)}</span>
+                    {renderSectionStatus('liabilities')}
+                  </div>
+                  <span className="section-toggle">{openSections.liabilities ? '−' : '+'}</span>
+                </div>
+                <div className={`section-content ${openSections.liabilities ? 'active' : ''}`}>
+                  <h4 style={{ marginTop: 0 }}>Declarant</h4>
+                  {formData.liabilities.declarant.map((item, index) => (
+                    <div className="repeater-item" key={`liability-declarant-${index}`}>
+                      <button type="button" className="repeater-remove" onClick={() => removeLiabilityItem('declarant', index)}>
+                        ×
+                      </button>
+
+                      <div className="form-row-3">
+                        <div className="form-group">
+                          <label>Nature</label>
+                          <input
+                            type="text"
+                            value={item.nature || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.liabilities.declarant[index].nature = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Creditor Name</label>
+                          <input
+                            type="text"
+                            value={item.creditor_name || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.liabilities.declarant[index].creditor_name = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Outstanding Balance (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.outstanding_balance || ''}
+                            onChange={(e) => setLiabilityBalanceField('declarant', index, e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`]}
+                          />
+                          {numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`] ? (
+                            <p className="error">{numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={() => addLiabilityItem('declarant', () => ({ nature: '', creditor_name: '', outstanding_balance: '' }))}
+                  >
+                    + Add Declarant Liability
+                  </button>
+
+                  <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
+                  {formData.liabilities.spouse_children.map((item, index) => (
+                    <div className="repeater-item" key={`liability-spouse_children-${index}`}>
+                      <button
+                        type="button"
+                        className="repeater-remove"
+                        onClick={() => removeLiabilityItem('spouse_children', index)}
+                      >
+                        ×
+                      </button>
+
+                      {renderOwnerSelect(item.owner_ref, (value) =>
+                        updateForm((next) => {
+                          next.liabilities.spouse_children[index].owner_ref = value
+                        }),
+                      )}
+
+                      <div className="form-row-3">
+                        <div className="form-group">
+                          <label>Nature</label>
+                          <input
+                            type="text"
+                            value={item.nature || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.liabilities.spouse_children[index].nature = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Creditor Name</label>
+                          <input
+                            type="text"
+                            value={item.creditor_name || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.liabilities.spouse_children[index].creditor_name = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Outstanding Balance (PHP)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.outstanding_balance || ''}
+                            onChange={(e) => setLiabilityBalanceField('spouse_children', index, e.target.value)}
+                            aria-invalid={!!numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`]}
+                          />
+                          {numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`] ? (
+                            <p className="error">{numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`]}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="btn btn-add-item"
+                    onClick={() =>
+                      addLiabilityItem('spouse_children', () => ({ owner_ref: '', nature: '', creditor_name: '', outstanding_balance: '' }))
+                    }
+                  >
+                    + Add Spouse/Children Liability
+                  </button>
+                </div>
+              </div>
+
+              {/* Net Worth Summary Section */}
+              <div className="card" data-section="netWorthSummary" style={{ marginTop: '24px' }}>
+                <h3 style={{ marginBottom: '12px' }}>Net Worth Summary</h3>
+                <p style={{ margin: 0 }}><strong>Total Assets:</strong> PHP {formatCurrency(assetsTotal)}</p>
+                <p style={{ margin: '8px 0 0 0', marginBottom: 0 }}><strong>Total Liabilities:</strong> PHP {formatCurrency(liabilitiesTotal)}</p>
+                <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '12px 0' }} />
+                <p style={{ marginTop: 0, marginBottom: 0 }}>
+                  <strong>Net Worth:</strong> PHP {formatCurrency(netWorth)}
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Business Interests Tab */}
+          {currentTab === 'business' && (
+            <div className="form-section" data-section="business">
+              <div className="section-header" style={{ cursor: 'default' }}>
+                <div className="section-header-main">
+                  <h3>Business Interests and Financial Connections</h3>
+                  {renderSectionStatus('business')}
+                </div>
+              </div>
+              <div className="section-content active">
+                <h4 style={{ marginTop: 0 }}>Declarant</h4>
                 <div className="form-group">
                   <label>
                     <input
                       type="checkbox"
-                      checked={!!spouse.is_public_official}
-                      onChange={(e) => setSpouseField(idx, 'is_public_official', e.target.checked)}
+                      checked={!formData.business_interests.declarant.has_business_interest}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          const isNotApplicable = e.target.checked
+                          next.business_interests.declarant.has_business_interest = !isNotApplicable
+                          if (isNotApplicable) {
+                            next.business_interests.declarant.entries = []
+                          }
+                        })
+                      }
                     />{' '}
-                    Is a public official
+                    N/A
                   </label>
                 </div>
 
+                {formData.business_interests.declarant.has_business_interest
+                  ? formData.business_interests.declarant.entries.map((item, index) => (
+                      <div className="repeater-item" key={`business-declarant-${index}`}>
+                        <button
+                          type="button"
+                          className="repeater-remove"
+                          onClick={() => removeBusinessEntry('declarant', index)}
+                        >
+                          ×
+                        </button>
+
+                        <div className="form-group">
+                          <label>Entity Name</label>
+                          <input
+                            type="text"
+                            value={item.entity_name || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.business_interests.declarant.entries[index].entity_name = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Business Address</label>
+                          <input
+                            type="text"
+                            value={item.business_address || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.business_interests.declarant.entries[index].business_address = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>Nature of Interest</label>
+                            <input
+                              type="text"
+                              value={item.nature_of_interest || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.business_interests.declarant.entries[index].nature_of_interest = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Date Acquired</label>
+                            <input
+                              type="date"
+                              value={item.date_acquired || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.business_interests.declarant.entries[index].date_acquired = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  : null}
+
+                {formData.business_interests.declarant.has_business_interest ? (
+                  <button type="button" className="btn btn-add-item" onClick={() => addBusinessEntry('declarant')}>
+                    + Add Declarant Business Interest
+                  </button>
+                ) : null}
+
+                <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
                 <div className="form-group">
-                  <label>Position</label>
-                  <input
-                    type="text"
-                    value={spouse.position || ''}
-                    onChange={(e) => setSpouseField(idx, 'position', e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Agency/Office</label>
-                  <input
-                    type="text"
-                    value={spouse.agency_office || ''}
-                    onChange={(e) => setSpouseField(idx, 'agency_office', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Office Address</label>
-                  <input
-                    type="text"
-                    value={spouse.office_address || ''}
-                    onChange={(e) => setSpouseField(idx, 'office_address', e.target.value)}
-                  />
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={addSpouse}
-            >
-              + Add Spouse
-            </button>
-          </div>
-        </div>
-
-        <div className="form-section" data-section="children">
-          <div className="section-header" onClick={() => toggleSection('children')}>
-            <div className="section-header-main">
-              <h3>Children Below 18</h3>
-              {renderSectionStatus('children')}
-            </div>
-            <span className="section-toggle">{openSections.children ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.children ? 'active' : ''}`}>
-            {formData.children_below_18.map((child, index) => (
-              <div className="repeater-item" key={child?.id || `child-${index}`}>
-                <button type="button" className="repeater-remove" onClick={() => removeChild(index)}>
-                  ×
-                </button>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Name</label>
+                  <label>
                     <input
-                      type="text"
-                      value={child.name || ''}
+                      type="checkbox"
+                      checked={!formData.business_interests.spouse_children.has_business_interest}
                       onChange={(e) =>
                         updateForm((next) => {
-                          next.children_below_18[index].name = e.target.value
+                          const isNotApplicable = e.target.checked
+                          next.business_interests.spouse_children.has_business_interest = !isNotApplicable
+                          if (isNotApplicable) {
+                            next.business_interests.spouse_children.entries = []
+                          }
                         })
                       }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Age</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={child.age || ''}
-                      onChange={(e) => setChildAgeField(index, e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`children_below_18.${index}.age`]}
-                    />
-                    {numericFieldErrors[`children_below_18.${index}.age`] ? (
-                      <p className="error">{numericFieldErrors[`children_below_18.${index}.age`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={addChild}
-            >
-              + Add Child
-            </button>
-          </div>
-        </div>
-
-        <div className="form-section" data-section="realProperties">
-          <div className="section-header" onClick={() => toggleSection('realProperties')}>
-            <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0 }}>Real Properties</h3>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>
-                Total Assessed: PHP {formatCurrency(realPropertiesAssessedTotal)} | Total FMV: PHP {formatCurrency(realPropertiesFairMarketTotal)}
-              </span>
-              {renderSectionStatus('realProperties')}
-            </div>
-            <span className="section-toggle">{openSections.realProperties ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.realProperties ? 'active' : ''}`}>
-            <h4 style={{ marginTop: 0 }}>Declarant</h4>
-            {formData.assets.declarant.real_properties.map((item, index) => (
-              <div className="repeater-item" key={`real-declarant-${index}`}>
-                <button
-                  type="button"
-                  className="repeater-remove"
-                  onClick={() => removeAssetItem('declarant', 'real_properties', index)}
-                >
-                  ×
-                </button>
-
-                <div className="form-group">
-                  <label>Description</label>
-                  <input
-                    type="text"
-                    value={item.description || ''}
-                    onChange={(e) =>
-                      updateForm((next) => {
-                        next.assets.declarant.real_properties[index].description = e.target.value
-                      })
-                    }
-                  />
+                    />{' '}
+                    N/A
+                  </label>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Kind</label>
-                    <select
-                      value={item.kind || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.declarant.real_properties[index].kind = e.target.value
-                        })
-                      }
-                    >
-                      <option value="">Select</option>
-                      <option value="RESIDENTIAL">Residential</option>
-                      <option value="COMMERCIAL">Commercial</option>
-                      <option value="INDUSTRIAL">Industrial</option>
-                      <option value="AGRICULTURAL">Agricultural</option>
-                      <option value="MIXED_USE">Mixed Use</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Location</label>
-                    <input
-                      type="text"
-                      value={item.exact_location || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.declarant.real_properties[index].exact_location = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                </div>
+                {formData.business_interests.spouse_children.has_business_interest
+                  ? formData.business_interests.spouse_children.entries.map((item, index) => (
+                      <div className="repeater-item" key={`business-spouse_children-${index}`}>
+                        <button
+                          type="button"
+                          className="repeater-remove"
+                          onClick={() => removeBusinessEntry('spouse_children', index)}
+                        >
+                          ×
+                        </button>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Assessed Value (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.assessed_value || ''}
-                      onChange={(e) => setRealPropertyValueField('declarant', index, 'assessed_value', e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`]}
-                    />
-                    {numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`] ? (
-                      <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.assessed_value`]}</p>
-                    ) : null}
-                  </div>
-                  <div className="form-group">
-                    <label>Fair Market Value (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.fair_market_value || ''}
-                      onChange={(e) => setRealPropertyValueField('declarant', index, 'fair_market_value', e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`]}
-                    />
-                    {numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`] ? (
-                      <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.fair_market_value`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <h4 style={{ marginTop: '16px' }}>Acquisition</h4>
-                <div className="form-row-3">
-                  <div className="form-group">
-                    <label>Year</label>
-                    <input
-                      type="number"
-                      min={1900}
-                      max={2100}
-                      value={item.acquisition?.year || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.declarant.real_properties[index].acquisition.year = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Mode</label>
-                    <select
-                      value={item.acquisition?.mode || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.declarant.real_properties[index].acquisition.mode = e.target.value
-                        })
-                      }
-                    >
-                      <option value="">Select</option>
-                      <option value="PURCHASE">Purchase</option>
-                      <option value="INHERITANCE">Inheritance</option>
-                      <option value="DONATION">Donation</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Cost (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.acquisition?.cost || ''}
-                      onChange={(e) => setRealPropertyValueField('declarant', index, 'acquisition.cost', e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`]}
-                    />
-                    {numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`] ? (
-                      <p className="error">{numericFieldErrors[`assets.declarant.real_properties.${index}.acquisition.cost`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={() =>
-                addAssetItem('declarant', 'real_properties', () => ({
-                  description: '',
-                  kind: '',
-                  exact_location: '',
-                  assessed_value: '',
-                  fair_market_value: '',
-                  acquisition: { year: '', mode: '', cost: '' },
-                }))
-              }
-            >
-              + Add Declarant Real Property
-            </button>
-
-            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
-            {formData.assets.spouse_children.real_properties.map((item, index) => (
-              <div className="repeater-item" key={`real-spouse_children-${index}`}>
-                <button
-                  type="button"
-                  className="repeater-remove"
-                  onClick={() => removeAssetItem('spouse_children', 'real_properties', index)}
-                >
-                  ×
-                </button>
-
-                {renderOwnerSelect(item.owner_ref, (value) =>
-                  updateForm((next) => {
-                    next.assets.spouse_children.real_properties[index].owner_ref = value
-                  }),
-                )}
-
-                <div className="form-group">
-                  <label>Description</label>
-                  <input
-                    type="text"
-                    value={item.description || ''}
-                    onChange={(e) =>
-                      updateForm((next) => {
-                        next.assets.spouse_children.real_properties[index].description = e.target.value
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Kind</label>
-                    <select
-                      value={item.kind || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.spouse_children.real_properties[index].kind = e.target.value
-                        })
-                      }
-                    >
-                      <option value="">Select</option>
-                      <option value="RESIDENTIAL">Residential</option>
-                      <option value="COMMERCIAL">Commercial</option>
-                      <option value="INDUSTRIAL">Industrial</option>
-                      <option value="AGRICULTURAL">Agricultural</option>
-                      <option value="MIXED_USE">Mixed Use</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Location</label>
-                    <input
-                      type="text"
-                      value={item.exact_location || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.spouse_children.real_properties[index].exact_location = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Assessed Value (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.assessed_value || ''}
-                      onChange={(e) =>
-                        setRealPropertyValueField('spouse_children', index, 'assessed_value', e.target.value)
-                      }
-                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`]}
-                    />
-                    {numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`] ? (
-                      <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.assessed_value`]}</p>
-                    ) : null}
-                  </div>
-                  <div className="form-group">
-                    <label>Fair Market Value (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.fair_market_value || ''}
-                      onChange={(e) =>
-                        setRealPropertyValueField('spouse_children', index, 'fair_market_value', e.target.value)
-                      }
-                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`]}
-                    />
-                    {numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`] ? (
-                      <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.fair_market_value`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <h4 style={{ marginTop: '16px' }}>Acquisition</h4>
-                <div className="form-row-3">
-                  <div className="form-group">
-                    <label>Year</label>
-                    <input
-                      type="number"
-                      min={1900}
-                      max={2100}
-                      value={item.acquisition?.year || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.spouse_children.real_properties[index].acquisition.year = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Mode</label>
-                    <select
-                      value={item.acquisition?.mode || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.spouse_children.real_properties[index].acquisition.mode = e.target.value
-                        })
-                      }
-                    >
-                      <option value="">Select</option>
-                      <option value="PURCHASE">Purchase</option>
-                      <option value="INHERITANCE">Inheritance</option>
-                      <option value="DONATION">Donation</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Cost (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.acquisition?.cost || ''}
-                      onChange={(e) =>
-                        setRealPropertyValueField('spouse_children', index, 'acquisition.cost', e.target.value)
-                      }
-                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`]}
-                    />
-                    {numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`] ? (
-                      <p className="error">{numericFieldErrors[`assets.spouse_children.real_properties.${index}.acquisition.cost`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={() =>
-                addAssetItem('spouse_children', 'real_properties', () => ({
-                  owner_ref: '',
-                  description: '',
-                  kind: '',
-                  exact_location: '',
-                  assessed_value: '',
-                  fair_market_value: '',
-                  acquisition: { year: '', mode: '', cost: '' },
-                }))
-              }
-            >
-              + Add Spouse/Children Real Property
-            </button>
-          </div>
-        </div>
-
-        <div className="form-section" data-section="personalProperties">
-          <div className="section-header" onClick={() => toggleSection('personalProperties')}>
-            <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0 }}>Personal Properties</h3>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>Total: PHP {formatCurrency(personalPropertiesTotal)}</span>
-              {renderSectionStatus('personalProperties')}
-            </div>
-            <span className="section-toggle">{openSections.personalProperties ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.personalProperties ? 'active' : ''}`}>
-            <h4 style={{ marginTop: 0 }}>Declarant</h4>
-            {formData.assets.declarant.personal_properties.map((item, index) => (
-              <div className="repeater-item" key={`personal-declarant-${index}`}>
-                <button
-                  type="button"
-                  className="repeater-remove"
-                  onClick={() => removeAssetItem('declarant', 'personal_properties', index)}
-                >
-                  ×
-                </button>
-
-                <div className="form-group">
-                  <label>Description</label>
-                  <input
-                    type="text"
-                    value={item.description || ''}
-                    onChange={(e) =>
-                      updateForm((next) => {
-                        next.assets.declarant.personal_properties[index].description = e.target.value
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Year Acquired</label>
-                    <input
-                      type="number"
-                      min={1900}
-                      max={2100}
-                      value={item.acquisition_year || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.declarant.personal_properties[index].acquisition_year = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Acquisition Cost (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.acquisition_cost || ''}
-                      onChange={(e) => setPersonalPropertyCostField('declarant', index, e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`]}
-                    />
-                    {numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`] ? (
-                      <p className="error">{numericFieldErrors[`assets.declarant.personal_properties.${index}.acquisition_cost`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={() =>
-                addAssetItem('declarant', 'personal_properties', () => ({
-                  description: '',
-                  acquisition_year: '',
-                  acquisition_cost: '',
-                }))
-              }
-            >
-              + Add Declarant Personal Property
-            </button>
-
-            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
-            {formData.assets.spouse_children.personal_properties.map((item, index) => (
-              <div className="repeater-item" key={`personal-spouse_children-${index}`}>
-                <button
-                  type="button"
-                  className="repeater-remove"
-                  onClick={() => removeAssetItem('spouse_children', 'personal_properties', index)}
-                >
-                  ×
-                </button>
-
-                {renderOwnerSelect(item.owner_ref, (value) =>
-                  updateForm((next) => {
-                    next.assets.spouse_children.personal_properties[index].owner_ref = value
-                  }),
-                )}
-
-                <div className="form-group">
-                  <label>Description</label>
-                  <input
-                    type="text"
-                    value={item.description || ''}
-                    onChange={(e) =>
-                      updateForm((next) => {
-                        next.assets.spouse_children.personal_properties[index].description = e.target.value
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Year Acquired</label>
-                    <input
-                      type="number"
-                      min={1900}
-                      max={2100}
-                      value={item.acquisition_year || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.assets.spouse_children.personal_properties[index].acquisition_year = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Acquisition Cost (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.acquisition_cost || ''}
-                      onChange={(e) => setPersonalPropertyCostField('spouse_children', index, e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`]}
-                    />
-                    {numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`] ? (
-                      <p className="error">{numericFieldErrors[`assets.spouse_children.personal_properties.${index}.acquisition_cost`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={() =>
-                addAssetItem('spouse_children', 'personal_properties', () => ({
-                  owner_ref: '',
-                  description: '',
-                  acquisition_year: '',
-                  acquisition_cost: '',
-                }))
-              }
-            >
-              + Add Spouse/Children Personal Property
-            </button>
-          </div>
-        </div>
-
-        <div className="form-section" data-section="liabilities">
-          <div className="section-header" onClick={() => toggleSection('liabilities')}>
-            <div className="section-header-main" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0 }}>Liabilities</h3>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '14px' }}>Total: PHP {formatCurrency(liabilitiesOutstandingTotal)}</span>
-              {renderSectionStatus('liabilities')}
-            </div>
-            <span className="section-toggle">{openSections.liabilities ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.liabilities ? 'active' : ''}`}>
-            <h4 style={{ marginTop: 0 }}>Declarant</h4>
-            {formData.liabilities.declarant.map((item, index) => (
-              <div className="repeater-item" key={`liability-declarant-${index}`}>
-                <button type="button" className="repeater-remove" onClick={() => removeLiabilityItem('declarant', index)}>
-                  ×
-                </button>
-
-                <div className="form-row-3">
-                  <div className="form-group">
-                    <label>Nature</label>
-                    <input
-                      type="text"
-                      value={item.nature || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.liabilities.declarant[index].nature = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Creditor Name</label>
-                    <input
-                      type="text"
-                      value={item.creditor_name || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.liabilities.declarant[index].creditor_name = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Outstanding Balance (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.outstanding_balance || ''}
-                      onChange={(e) => setLiabilityBalanceField('declarant', index, e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`]}
-                    />
-                    {numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`] ? (
-                      <p className="error">{numericFieldErrors[`liabilities.declarant.${index}.outstanding_balance`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={() => addLiabilityItem('declarant', () => ({ nature: '', creditor_name: '', outstanding_balance: '' }))}
-            >
-              + Add Declarant Liability
-            </button>
-
-            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
-            {formData.liabilities.spouse_children.map((item, index) => (
-              <div className="repeater-item" key={`liability-spouse_children-${index}`}>
-                <button
-                  type="button"
-                  className="repeater-remove"
-                  onClick={() => removeLiabilityItem('spouse_children', index)}
-                >
-                  ×
-                </button>
-
-                {renderOwnerSelect(item.owner_ref, (value) =>
-                  updateForm((next) => {
-                    next.liabilities.spouse_children[index].owner_ref = value
-                  }),
-                )}
-
-                <div className="form-row-3">
-                  <div className="form-group">
-                    <label>Nature</label>
-                    <input
-                      type="text"
-                      value={item.nature || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.liabilities.spouse_children[index].nature = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Creditor Name</label>
-                    <input
-                      type="text"
-                      value={item.creditor_name || ''}
-                      onChange={(e) =>
-                        updateForm((next) => {
-                          next.liabilities.spouse_children[index].creditor_name = e.target.value
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Outstanding Balance (PHP)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.outstanding_balance || ''}
-                      onChange={(e) => setLiabilityBalanceField('spouse_children', index, e.target.value)}
-                      aria-invalid={!!numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`]}
-                    />
-                    {numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`] ? (
-                      <p className="error">{numericFieldErrors[`liabilities.spouse_children.${index}.outstanding_balance`]}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className="btn btn-add-item"
-              onClick={() =>
-                addLiabilityItem('spouse_children', () => ({ owner_ref: '', nature: '', creditor_name: '', outstanding_balance: '' }))
-              }
-            >
-              + Add Spouse/Children Liability
-            </button>
-          </div>
-        </div>
-
-        <div className="form-section" data-section="business">
-          <div className="section-header" onClick={() => toggleSection('business')}>
-            <div className="section-header-main">
-              <h3>Business Interests and Financial Connections</h3>
-              {renderSectionStatus('business')}
-            </div>
-            <span className="section-toggle">{openSections.business ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.business ? 'active' : ''}`}>
-            <h4 style={{ marginTop: 0 }}>Declarant</h4>
-            <div className="form-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!formData.business_interests.declarant.has_business_interest}
-                  onChange={(e) =>
-                    updateForm((next) => {
-                      const isNotApplicable = e.target.checked
-                      next.business_interests.declarant.has_business_interest = !isNotApplicable
-                      if (isNotApplicable) {
-                        next.business_interests.declarant.entries = []
-                      }
-                    })
-                  }
-                />{' '}
-                N/A
-              </label>
-            </div>
-
-            {formData.business_interests.declarant.has_business_interest
-              ? formData.business_interests.declarant.entries.map((item, index) => (
-                  <div className="repeater-item" key={`business-declarant-${index}`}>
-                    <button
-                      type="button"
-                      className="repeater-remove"
-                      onClick={() => removeBusinessEntry('declarant', index)}
-                    >
-                      ×
-                    </button>
-
-                    <div className="form-group">
-                      <label>Entity Name</label>
-                      <input
-                        type="text"
-                        value={item.entity_name || ''}
-                        onChange={(e) =>
+                        {renderOwnerSelect(item.owner_ref, (value) =>
                           updateForm((next) => {
-                            next.business_interests.declarant.entries[index].entity_name = e.target.value
-                          })
-                        }
-                      />
-                    </div>
+                            next.business_interests.spouse_children.entries[index].owner_ref = value
+                          }),
+                        )}
 
-                    <div className="form-group">
-                      <label>Business Address</label>
-                      <input
-                        type="text"
-                        value={item.business_address || ''}
-                        onChange={(e) =>
-                          updateForm((next) => {
-                            next.business_interests.declarant.entries[index].business_address = e.target.value
-                          })
-                        }
-                      />
-                    </div>
+                        <div className="form-group">
+                          <label>Entity Name</label>
+                          <input
+                            type="text"
+                            value={item.entity_name || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.business_interests.spouse_children.entries[index].entity_name = e.target.value
+                              })
+                            }
+                          />
+                        </div>
 
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Nature of Interest</label>
-                        <input
-                          type="text"
-                          value={item.nature_of_interest || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.business_interests.declarant.entries[index].nature_of_interest = e.target.value
-                            })
-                          }
-                        />
+                        <div className="form-group">
+                          <label>Business Address</label>
+                          <input
+                            type="text"
+                            value={item.business_address || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                next.business_interests.spouse_children.entries[index].business_address = e.target.value
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>Nature of Interest</label>
+                            <input
+                              type="text"
+                              value={item.nature_of_interest || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.business_interests.spouse_children.entries[index].nature_of_interest = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Date Acquired</label>
+                            <input
+                              type="date"
+                              value={item.date_acquired || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.business_interests.spouse_children.entries[index].date_acquired = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="form-group">
-                        <label>Date Acquired</label>
-                        <input
-                          type="date"
-                          value={item.date_acquired || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.business_interests.declarant.entries[index].date_acquired = e.target.value
-                            })
+                    ))
+                  : null}
+
+                {formData.business_interests.spouse_children.has_business_interest ? (
+                  <button type="button" className="btn btn-add-item" onClick={() => addBusinessEntry('spouse_children')}>
+                    + Add Spouse/Children Business Interest
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {/* Relatives in Government Service Tab */}
+          {currentTab === 'relatives' && (
+            <div className="form-section" data-section="relatives">
+              <div className="section-header" style={{ cursor: 'default' }}>
+                <div className="section-header-main">
+                  <h3>Relatives in Government Service</h3>
+                  {renderSectionStatus('relatives')}
+                </div>
+              </div>
+              <div className="section-content active">
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={!formData.relatives_in_government.has_relatives}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          const isNotApplicable = e.target.checked
+                          next.relatives_in_government.has_relatives = !isNotApplicable
+                          if (isNotApplicable) {
+                            next.relatives_in_government.entries = []
                           }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              : null}
-
-            {formData.business_interests.declarant.has_business_interest ? (
-              <button type="button" className="btn btn-add-item" onClick={() => addBusinessEntry('declarant')}>
-                + Add Declarant Business Interest
-              </button>
-            ) : null}
-
-            <h4 style={{ marginTop: '24px' }}>Spouse/Children</h4>
-            <div className="form-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!formData.business_interests.spouse_children.has_business_interest}
-                  onChange={(e) =>
-                    updateForm((next) => {
-                      const isNotApplicable = e.target.checked
-                      next.business_interests.spouse_children.has_business_interest = !isNotApplicable
-                      if (isNotApplicable) {
-                        next.business_interests.spouse_children.entries = []
+                        })
                       }
-                    })
-                  }
-                />{' '}
-                N/A
-              </label>
-            </div>
+                    />{' '}
+                    N/A
+                  </label>
+                </div>
 
-            {formData.business_interests.spouse_children.has_business_interest
-              ? formData.business_interests.spouse_children.entries.map((item, index) => (
-                  <div className="repeater-item" key={`business-spouse_children-${index}`}>
-                    <button
-                      type="button"
-                      className="repeater-remove"
-                      onClick={() => removeBusinessEntry('spouse_children', index)}
-                    >
-                      ×
-                    </button>
+                {formData.relatives_in_government.has_relatives
+                  ? formData.relatives_in_government.entries.map((item, index) => (
+                      <div className="repeater-item" key={`relative-${index}`}>
+                        <button type="button" className="repeater-remove" onClick={() => removeRelativeEntry(index)}>
+                          ×
+                        </button>
 
-                    {renderOwnerSelect(item.owner_ref, (value) =>
-                      updateForm((next) => {
-                        next.business_interests.spouse_children.entries[index].owner_ref = value
-                      }),
-                    )}
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>Name</label>
+                            <input
+                              type="text"
+                              value={item.relative_name || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.relatives_in_government.entries[index].relative_name = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Relationship</label>
+                            <input
+                              type="text"
+                              value={item.relationship || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.relatives_in_government.entries[index].relationship = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
 
-                    <div className="form-group">
-                      <label>Entity Name</label>
-                      <input
-                        type="text"
-                        value={item.entity_name || ''}
-                        onChange={(e) =>
-                          updateForm((next) => {
-                            next.business_interests.spouse_children.entries[index].entity_name = e.target.value
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Business Address</label>
-                      <input
-                        type="text"
-                        value={item.business_address || ''}
-                        onChange={(e) =>
-                          updateForm((next) => {
-                            next.business_interests.spouse_children.entries[index].business_address = e.target.value
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Nature of Interest</label>
-                        <input
-                          type="text"
-                          value={item.nature_of_interest || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.business_interests.spouse_children.entries[index].nature_of_interest = e.target.value
-                            })
-                          }
-                        />
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>Position</label>
+                            <input
+                              type="text"
+                              value={item.position || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.relatives_in_government.entries[index].position = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Agency/Office</label>
+                            <input
+                              type="text"
+                              value={item.agency_office || ''}
+                              onChange={(e) =>
+                                updateForm((next) => {
+                                  next.relatives_in_government.entries[index].agency_office = e.target.value
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="form-group">
-                        <label>Date Acquired</label>
-                        <input
-                          type="date"
-                          value={item.date_acquired || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.business_interests.spouse_children.entries[index].date_acquired = e.target.value
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              : null}
+                    ))
+                  : null}
 
-            {formData.business_interests.spouse_children.has_business_interest ? (
-              <button type="button" className="btn btn-add-item" onClick={() => addBusinessEntry('spouse_children')}>
-                + Add Spouse/Children Business Interest
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="form-section" data-section="relatives">
-          <div className="section-header" onClick={() => toggleSection('relatives')}>
-            <div className="section-header-main">
-              <h3>Relatives in Government Service</h3>
-              {renderSectionStatus('relatives')}
+                {formData.relatives_in_government.has_relatives ? (
+                  <button type="button" className="btn btn-add-item" onClick={addRelativeEntry}>
+                    + Add Relative
+                  </button>
+                ) : null}
+              </div>
             </div>
-            <span className="section-toggle">{openSections.relatives ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.relatives ? 'active' : ''}`}>
-            <div className="form-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!formData.relatives_in_government.has_relatives}
-                  onChange={(e) =>
-                    updateForm((next) => {
-                      const isNotApplicable = e.target.checked
-                      next.relatives_in_government.has_relatives = !isNotApplicable
-                      if (isNotApplicable) {
-                        next.relatives_in_government.entries = []
+          )}
+
+          {/* Certification Tab */}
+          {currentTab === 'certification' && (
+            <div className="form-section" data-section="certification">
+              <div className="section-header" style={{ cursor: 'default' }}>
+                <div className="section-header-main">
+                  <h3>Certification</h3>
+                  {renderSectionStatus('certification')}
+                </div>
+              </div>
+              <div className="section-content active">
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={!!formData.certification.authorization_to_verify}
+                      onChange={(e) =>
+                        updateForm((next) => {
+                          next.certification.authorization_to_verify = e.target.checked
+                        })
                       }
-                    })
-                  }
-                />{' '}
-                N/A
-              </label>
+                    />{' '}
+                    I authorize the Ombudsman or authorized representative to verify my SALN statements
+                  </label>
+                </div>
+              </div>
             </div>
+          )}
 
-            {formData.relatives_in_government.has_relatives
-              ? formData.relatives_in_government.entries.map((item, index) => (
-                  <div className="repeater-item" key={`relative-${index}`}>
-                    <button type="button" className="repeater-remove" onClick={() => removeRelativeEntry(index)}>
-                      ×
-                    </button>
-
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Name</label>
-                        <input
-                          type="text"
-                          value={item.relative_name || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.relatives_in_government.entries[index].relative_name = e.target.value
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Relationship</label>
-                        <input
-                          type="text"
-                          value={item.relationship || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.relatives_in_government.entries[index].relationship = e.target.value
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Position</label>
-                        <input
-                          type="text"
-                          value={item.position || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.relatives_in_government.entries[index].position = e.target.value
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Agency/Office</label>
-                        <input
-                          type="text"
-                          value={item.agency_office || ''}
-                          onChange={(e) =>
-                            updateForm((next) => {
-                              next.relatives_in_government.entries[index].agency_office = e.target.value
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              : null}
-
-            {formData.relatives_in_government.has_relatives ? (
-              <button type="button" className="btn btn-add-item" onClick={addRelativeEntry}>
-                + Add Relative
-              </button>
-            ) : null}
+          {/* Privacy Notice - visible in all tabs */}
+          <div className="privacy-notice">
+            <p style={{ fontWeight: 500, marginBottom: '8px' }}>Privacy Reminder</p>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
+              Your data will be automatically deleted after 5 days of inactivity. Export your data locally as JSON for backup.
+            </p>
           </div>
-        </div>
+          <div className="privacy-notice-spacer" aria-hidden="true" />
+        </main>
+      </div>
 
-        <div className="form-section" data-section="certification">
-          <div className="section-header" onClick={() => toggleSection('certification')}>
-            <div className="section-header-main">
-              <h3>Certification</h3>
-              {renderSectionStatus('certification')}
-            </div>
-            <span className="section-toggle">{openSections.certification ? '−' : '+'}</span>
-          </div>
-          <div className={`section-content ${openSections.certification ? 'active' : ''}`}>
-            <div className="form-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={!!formData.certification.authorization_to_verify}
-                  onChange={(e) =>
-                    updateForm((next) => {
-                      next.certification.authorization_to_verify = e.target.checked
-                    })
-                  }
-                />{' '}
-                I authorize the Ombudsman or authorized representative to verify my SALN statements
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div className="card" style={{ marginTop: '24px' }}>
-          <h3 style={{ marginBottom: '12px' }}>Net Worth Summary</h3>
-          <p style={{ margin: 0 }}><strong>Total Assets:</strong> PHP {formatCurrency(assetsTotal)}</p>
-          <p style={{ margin: '8px 0 0 0', marginBottom: 0 }}><strong>Total Liabilities:</strong> PHP {formatCurrency(liabilitiesTotal)}</p>
-          <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '12px 0' }} />
-          <p style={{ marginTop: 0, marginBottom: 0 }}>
-            <strong>Net Worth:</strong> PHP {formatCurrency(netWorth)}
-          </p>
-        </div>
-
-        <div className="privacy-notice">
-          <p style={{ fontWeight: 500, marginBottom: '8px' }}>Privacy Reminder</p>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
-            Your data will be automatically deleted after 5 days of inactivity. Export your data locally as JSON for backup.
-          </p>
-          </div>
-        </div>
-
-      <footer style={{ backgroundColor: 'var(--bg-light)', borderTop: '1px solid var(--border-color)', padding: '32px 0', marginTop: '48px' }}>
-        <div className="container">
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
-            © {new Date().getFullYear()} SALN Filing System
-          </p>
-        </div>
-      </footer>
-    </>
+    <footer className="dashboard-footer" style={{ backgroundColor: 'var(--bg-light)', borderTop: '1px solid var(--border-color)', padding: '32px 0' }}>
+      <div className="container">
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+          © {new Date().getFullYear()} SALN Filing System
+        </p>
+      </div>
+    </footer>
+    </div>
   )
 }
 
