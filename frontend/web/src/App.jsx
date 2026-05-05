@@ -2087,9 +2087,7 @@ function DashboardPage() {
                         <div className="form-group">
                           <label>Year</label>
                           <input
-                            type="number"
-                            min={1900}
-                            max={2100}
+                            type="text"
                             value={item.acquisition?.year || ''}
                             onChange={(e) =>
                               updateForm((next) => {
@@ -2250,9 +2248,7 @@ function DashboardPage() {
                         <div className="form-group">
                           <label>Year</label>
                           <input
-                            type="number"
-                            min={1900}
-                            max={2100}
+                            type="text"
                             value={item.acquisition?.year || ''}
                             onChange={(e) =>
                               updateForm((next) => {
@@ -2356,9 +2352,7 @@ function DashboardPage() {
                         <div className="form-group">
                           <label>Year Acquired</label>
                           <input
-                            type="number"
-                            min={1900}
-                            max={2100}
+                            type="text"
                             value={item.acquisition_year || ''}
                             onChange={(e) =>
                               updateForm((next) => {
@@ -2432,9 +2426,7 @@ function DashboardPage() {
                         <div className="form-group">
                           <label>Year Acquired</label>
                           <input
-                            type="number"
-                            min={1900}
-                            max={2100}
+                            type="text"
                             value={item.acquisition_year || ''}
                             onChange={(e) =>
                               updateForm((next) => {
