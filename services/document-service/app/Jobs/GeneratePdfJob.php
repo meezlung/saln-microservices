@@ -20,6 +20,25 @@ class GeneratePdfJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    // helper functions for checking if rows have real values (for annex c)
+    private static function hasRealValues(array $row): bool
+    {
+        foreach ($row as $value) {
+            if ($value !== null && $value !== '') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function hasRealEntries(array $rows): bool
+    {
+        return !empty(array_filter(
+            $rows,
+            fn($row) => self::hasRealValues($row)
+        ));
+    }
+
     public function __construct(public int $documentId)
     {
     }
@@ -147,7 +166,19 @@ class GeneratePdfJob implements ShouldQueue
             ];
             }
 
-            $total_pages = $page_index + 2 + $page_index_spouse + 1; // +1 for the first page of spouse (annex C)
+            $has_spouse_data =
+                self::hasRealEntries($form_data['assets']['spouse_children']['real_properties'] ?? []) ||
+                self::hasRealEntries($form_data['assets']['spouse_children']['personal_properties'] ?? []) ||
+                self::hasRealEntries($temp_spouse_children['entries'] ?? []) ||
+                self::hasRealEntries($form_data['liabilities']['spouse_children'] ?? []);
+
+            $total_pages = $page_index + 2;
+
+            // +1 for the first page of spouse (annex C)
+            // only add the pages for spouse if there is data for spouse, otherwise skip annex C entirely
+            if ($has_spouse_data) {
+                $total_pages += ($page_index_spouse + 1);
+            } 
 
             for ($i = 0; $i < $total_pages; $i++)
             {
@@ -209,7 +240,7 @@ class GeneratePdfJob implements ShouldQueue
                         $fileTempPaths[] = $filler->fillToFile('annexB', $mappedData,$i,$doc);
                     }
 
-                } else {
+                } else if ($has_spouse_data)  {
                     // SPOUSE (Annex C)
                     // print("Page index: {$i} inside C\n");
                     $local_i = $i - ($page_index + 2);

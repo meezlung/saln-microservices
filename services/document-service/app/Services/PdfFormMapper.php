@@ -50,7 +50,7 @@ final class PdfFormMapper
         $fmt->setTextAttribute(NumberFormatter::CURRENCY_CODE, 'PHP');
         $fmt->setSymbol(NumberFormatter::CURRENCY_SYMBOL, 'PHP ');
         return $fmt->formatCurrency((float)$amount, 'PHP'); 
-        
+
     }
 
     public static function mapA(array $form, string $page_count): array
@@ -66,7 +66,7 @@ final class PdfFormMapper
         $business_interests = $temp['entries'] ?? $form['business_interests'] ?? [];
         
         $temp2 = $form['relatives_in_government'] ?? ['has_relatives' => false, 'entries' => []];
-        $rel_in_govt_service = $temp2 ?? $form['relatives_in_government_service'] ?? [];
+        $rel_in_govt_service = $temp2['entries'] ?? $form['relatives_in_government_service'] ?? [];
         
         $liabilities = $form['liabilities']['declarant'] ?? [];
 
@@ -74,6 +74,7 @@ final class PdfFormMapper
         [$spAddr1, $spAddr2]   = self::addressLines($spouse['office_address']?? '');
 
         $filingType = $form['form_metadata']['filing_type'] ?? $form['filing_type'] ?? '';
+        $govt_id = $declarant['government_id'] ?? '';
 
         $pdf = [
             // form metadata (ie just the top part)
@@ -91,6 +92,7 @@ final class PdfFormMapper
             'mult_spouse_not_applicable_check_box'=> self::checkbox($spouse === null || $spouse === []),
             'business_check_box'  => self::checkbox($business_interests !== null || $business_interests !== []),
             'relatives_check_box' => self::checkbox($rel_in_govt_service !== null || $rel_in_govt_service !== []),
+            # TODO incporate the has_business_interest and has_relatives boolean values if available instead of just checking if entries exist
 
             // declarant
             'declarant_family_name'      => $declarant['family_name'] ?? $declarant['last_name'] ?? '',
@@ -100,6 +102,13 @@ final class PdfFormMapper
             'declarant_agency_office'    => $declarant['agency_office'] ?? '',
             'declarant_office_addr_r1'   => $decAddr1 ?? '',
             'declarant_office_addr_r2'   => $decAddr2 ?? '',
+            'govt_id_c1'                 => $govt_id['type'] ?? '',
+            'id_no_c1'                   => $govt_id['id_number'] ?? '',
+            'date_issued_c1'             => $govt_id['date_issued'] ?? '',
+            'govt_id_c2'                 => $govt_id['type'] ?? '',
+            'id_no_c2'                   => $govt_id['id_number'] ?? '',
+            'date_issued_c2'             => $govt_id['date_issued'] ?? '',
+
 
             // spouse
             'spouse_family_name'   => $spouse['family_name'] ?? $spouse['last_name'] ?? '',
