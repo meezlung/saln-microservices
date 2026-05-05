@@ -126,7 +126,21 @@ function normalizeFormData(raw) {
   const rawChildren = Array.isArray(data.children_below_18) ? data.children_below_18 : []
   const children_below_18 = rawChildren.map((child) => {
     const id = typeof child?.id === 'string' && child.id ? child.id : generateRowId('child')
-    return { ...child, id }
+    const birthday = String(child?.birthday || '').trim()
+    let age = null
+    if (birthday) {
+      const birthdayDate = new Date(`${birthday}T00:00:00`)
+      if (!Number.isNaN(birthdayDate.getTime())) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        age = today.getFullYear() - birthdayDate.getFullYear()
+        const monthDiff = today.getMonth() - birthdayDate.getMonth()
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthdayDate.getDate())) {
+          age -= 1
+        }
+      }
+    }
+    return { ...child, id, age }
   })
 
   return {
@@ -700,13 +714,33 @@ function DashboardPage() {
     })
   }
 
+  function calculateAgeToday(birthdayValue) {
+    const birthday = new Date(birthdayValue)
+    birthday.setHours(0, 0, 0, 0)
+    if (Number.isNaN(birthday.getTime())) {
+      return null
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    let age = today.getFullYear() - birthday.getFullYear()
+    const monthDiff = today.getMonth() - birthday.getMonth()
+
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthday.getDate())) {
+      age -= 1
+    }
+
+    return age
+  }
+
   useEffect(() => {
     setNumericFieldErrors((prev) => {
       const next = { ...prev }
 
       Object.keys(next).forEach((key) => {
         if (
-          (key.startsWith('children_below_18.') && key.endsWith('.age')) ||
+          (key.startsWith('children_below_18.') && key.endsWith('.birthday')) ||
           key.includes('assets.declarant.real_properties.') ||
           key.includes('assets.spouse_children.real_properties.') ||
           key.includes('assets.declarant.personal_properties.') ||
@@ -718,21 +752,31 @@ function DashboardPage() {
         }
       })
 
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
       formData.children_below_18.forEach((child, index) => {
-        const value = String(child?.age ?? '')
-        if (value === '') {
+        const birthdayValue = String(child?.birthday || '').trim()
+        if (!birthdayValue) {
           return
         }
 
-        const errorKey = `children_below_18.${index}.age`
+        const errorKey = `children_below_18.${index}.birthday`
+        const birthdayDate = new Date(`${birthdayValue}T00:00:00`)
 
-        if (!WHOLE_NUMBER_REGEX.test(value)) {
-          next[errorKey] = 'Age must contain digits only.'
+        if (Number.isNaN(birthdayDate.getTime())) {
+          next[errorKey] = 'Enter a valid birthday.'
           return
         }
 
-        if (Number(value) >= 18) {
-          next[errorKey] = 'Age must be below 18.'
+        if (birthdayDate > today) {
+          next[errorKey] = 'Birthday cannot be in the future.'
+          return
+        }
+
+        const computedAge = calculateAgeToday(birthdayValue)
+        if (computedAge !== null && computedAge > 17) {
+          next[errorKey] = 'Child must be 17 years old or below as of today.'
         }
       })
 
@@ -1052,30 +1096,6 @@ function DashboardPage() {
     })
   }
 
-  function setChildAgeField(index, value) {
-    const errorKey = `children_below_18.${index}.age`
-
-    if (!WHOLE_NUMBER_REGEX.test(value)) {
-      setNumericFieldError(errorKey, 'Age must contain digits only.')
-      return
-    }
-
-    if (value !== '' && Number(value) >= 18) {
-      setNumericFieldError(errorKey, 'Age must be below 18.')
-
-      updateForm((next) => {
-        next.children_below_18[index].age = ''
-      })
-      return
-    }
-
-    setNumericFieldError(errorKey, '')
-
-    updateForm((next) => {
-      next.children_below_18[index].age = value
-    })
-  }
-
   function setRealPropertyValueField(bucket, index, field, value) {
     const errorKey = `assets.${bucket}.real_properties.${index}.${field}`
 
@@ -1178,7 +1198,7 @@ function DashboardPage() {
 
   function addChild() {
     updateForm((next) => {
-      next.children_below_18.push({ id: generateRowId('child'), name: '', age: '' })
+      next.children_below_18.push({ id: generateRowId('child'), name: '', birthday: '', age: null })
     })
   }
 
@@ -1674,6 +1694,11 @@ function DashboardPage() {
                     </select>
                   </div>
                 </div>
+                <div style={{ marginTop: '16px' }}>
+                  <button type="button" className="btn btn-success" onClick={handleSave}>
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1906,17 +1931,46 @@ function DashboardPage() {
                           />
                         </div>
                         <div className="form-group">
-                          <label>Age</label>
+                          <label>Birthday</label>
                           <input
-                            type="text"
-                            inputMode="numeric"
-                            value={child.age || ''}
-                            onChange={(e) => setChildAgeField(index, e.target.value)}
-                            aria-invalid={!!numericFieldErrors[`children_below_18.${index}.age`]}
+                            type="date"
+                            value={child.birthday || ''}
+                            onChange={(e) =>
+                              updateForm((next) => {
+                                const birthdayValue = e.target.value
+                                next.children_below_18[index].birthday = birthdayValue
+
+                                const birthdayDate = new Date(`${birthdayValue}T00:00:00`)
+                                if (birthdayValue && !Number.isNaN(birthdayDate.getTime())) {
+                                  const today = new Date()
+                                  today.setHours(0, 0, 0, 0)
+                                  const computedAge = calculateAgeToday(birthdayValue)
+
+                                  if (birthdayDate <= today && computedAge !== null && computedAge <= 17) {
+                                    next.children_below_18[index].age = computedAge
+                                  } else {
+                                    next.children_below_18[index].age = null
+                                  }
+                                } else {
+                                  next.children_below_18[index].age = null
+                                }
+                              })
+                            }
+                            aria-invalid={!!numericFieldErrors[`children_below_18.${index}.birthday`]}
                           />
-                          {numericFieldErrors[`children_below_18.${index}.age`] ? (
-                            <p className="error">{numericFieldErrors[`children_below_18.${index}.age`]}</p>
+                          {numericFieldErrors[`children_below_18.${index}.birthday`] ? (
+                            <p className="error">{numericFieldErrors[`children_below_18.${index}.birthday`]}</p>
                           ) : null}
+                        </div>
+                        <div className="form-group">
+                          <label>Age (as of today)</label>
+                          <input
+                            type="number"
+                            value={child.age !== null ? child.age : ''}
+                            readOnly
+                            placeholder="Computed from birthday"
+                            className="form-input"
+                          />
                         </div>
                       </div>
                     </div>
@@ -1929,6 +1983,11 @@ function DashboardPage() {
                     + Add Child
                   </button>
                 </div>
+              </div>
+              <div style={{ marginTop: '16px' }}>
+                <button type="button" className="btn btn-success" onClick={handleSave}>
+                  Save
+                </button>
               </div>
             </>
           )}
@@ -2579,6 +2638,11 @@ function DashboardPage() {
                   <strong>Net Worth:</strong> PHP {formatCurrency(netWorth)}
                 </p>
               </div>
+              <div style={{ marginTop: '16px' }}>
+                <button type="button" className="btn btn-success" onClick={handleSave}>
+                  Save
+                </button>
+              </div>
             </>
           )}
 
@@ -2783,6 +2847,11 @@ function DashboardPage() {
                     + Add Spouse/Children Business Interest
                   </button>
                 ) : null}
+                <div style={{ marginTop: '16px' }}>
+                  <button type="button" className="btn btn-success" onClick={handleSave}>
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -2885,6 +2954,11 @@ function DashboardPage() {
                     + Add Relative
                   </button>
                 ) : null}
+                <div style={{ marginTop: '16px' }}>
+                  <button type="button" className="btn btn-success" onClick={handleSave}>
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -2912,6 +2986,11 @@ function DashboardPage() {
                     />{' '}
                     I authorize the Ombudsman or authorized representative to verify my SALN statements
                   </label>
+                </div>
+                <div style={{ marginTop: '16px' }}>
+                  <button type="button" className="btn btn-success" onClick={handleSave}>
+                    Save
+                  </button>
                 </div>
               </div>
             </div>
