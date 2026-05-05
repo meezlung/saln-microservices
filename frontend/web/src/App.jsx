@@ -11,7 +11,6 @@ import {
 } from './lib/api'
 
 const THEME_STORAGE_KEY = 'theme'
-const GOV_ID_NUMBER_REGEX = /^\d*$/
 const WHOLE_NUMBER_REGEX = /^\d*$/
 const DECIMAL_NUMBER_REGEX = /^\d*(\.\d{0,2})?$/
 const PDF_POLL_INTERVAL_MS = 2000
@@ -548,7 +547,6 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
   const [sectionEmptyCounts, setSectionEmptyCounts] = useState({})
-  const [govIdNumberError, setGovIdNumberError] = useState('')
   const [numericFieldErrors, setNumericFieldErrors] = useState({})
 
   const formDataRef = useRef(formData)
@@ -1063,15 +1061,6 @@ function DashboardPage() {
   }
 
   function setGovIdField(field, value) {
-    if (field === 'id_number') {
-      if (!GOV_ID_NUMBER_REGEX.test(value)) {
-        setGovIdNumberError('ID Number must contain digits only.')
-        return
-      }
-
-      setGovIdNumberError('')
-    }
-
     updateForm((next) => {
       next.declarant.personal_information.government_id[field] = value
     })
@@ -1786,10 +1775,7 @@ function DashboardPage() {
                         type="text"
                         value={formData.declarant?.personal_information?.government_id?.id_number || ''}
                         onChange={(e) => setGovIdField('id_number', e.target.value)}
-                        inputMode="numeric"
-                        aria-invalid={!!govIdNumberError}
                       />
-                      {govIdNumberError ? <p className="error">{govIdNumberError}</p> : null}
                     </div>
                   </div>
                   <div className="form-group">
@@ -1913,7 +1899,11 @@ function DashboardPage() {
                 </div>
                 <div className={`section-content ${openSections.childrenInfo ? 'active' : ''}`}>
                   {formData.children_below_18.map((child, index) => (
-                    <div className="repeater-item" key={child?.id || `child-${index}`}>
+                    <div
+                      className="repeater-item"
+                      key={child?.id || `child-${index}`}
+                      style={{ position: 'relative', paddingBottom: '72px' }}
+                    >
                       <button type="button" className="repeater-remove" onClick={() => removeChild(index)}>
                         ×
                       </button>
@@ -1946,7 +1936,7 @@ function DashboardPage() {
                                   today.setHours(0, 0, 0, 0)
                                   const computedAge = calculateAgeToday(birthdayValue)
 
-                                  if (birthdayDate <= today && computedAge !== null && computedAge <= 17) {
+                                  if (birthdayDate <= today && computedAge !== null) {
                                     next.children_below_18[index].age = computedAge
                                   } else {
                                     next.children_below_18[index].age = null
@@ -1962,15 +1952,13 @@ function DashboardPage() {
                             <p className="error">{numericFieldErrors[`children_below_18.${index}.birthday`]}</p>
                           ) : null}
                         </div>
-                        <div className="form-group">
-                          <label>Age (as of today)</label>
-                          <input
-                            type="number"
-                            value={child.age !== null ? child.age : ''}
-                            readOnly
-                            placeholder="Computed from birthday"
-                            className="form-input"
-                          />
+                        <div style={{ position: 'absolute', right: '20px', bottom: '18px', textAlign: 'right' }}>
+                          <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)' }}>
+                            {child.age !== null ? child.age : '—'}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            Age as of today
+                          </div>
                         </div>
                       </div>
                     </div>
