@@ -561,6 +561,15 @@ function DashboardPage() {
     { value: 'certification', label: 'Certification', icon: '✅' },
   ]
 
+  const tabSectionMap = {
+    formInfo: ['formInfo'],
+    personalFamily: ['personalInfo', 'spouseInfo', 'childrenInfo'],
+    assetsLiabilities: ['realProperties', 'personalProperties', 'liabilities'],
+    business: ['business'],
+    relatives: ['relatives'],
+    certification: ['certification'],
+  }
+
   useEffect(() => {
     formDataRef.current = formData
   }, [formData])
@@ -971,7 +980,10 @@ function DashboardPage() {
         nextCounts[key] = section.querySelectorAll('.field-empty').length
       })
 
-      setSectionEmptyCounts(nextCounts)
+      setSectionEmptyCounts((prev) => ({
+        ...prev,
+        ...nextCounts,
+      }))
     }
 
     applyEmptyIndicators()
@@ -1035,6 +1047,28 @@ function DashboardPage() {
     }
 
     return <span className="section-status incomplete">{emptyCount} empty</span>
+  }
+
+  function getSectionStatus(sectionKey) {
+    const sectionAliases = {
+      personal: 'personalInfo',
+      spouse: 'spouseInfo',
+      children: 'childrenInfo',
+    }
+
+    const normalizedSectionKey = sectionAliases[sectionKey] || sectionKey
+
+    if (normalizedSectionKey === 'certification') {
+      return !!formData.certification?.authorization_to_verify
+    }
+
+    const emptyCount = sectionEmptyCounts[normalizedSectionKey] ?? 0
+    return emptyCount === 0
+  }
+
+  function getTabStatus(tabKey) {
+    const sectionKeys = tabSectionMap[tabKey] || [tabKey]
+    return sectionKeys.every((sectionKey) => getSectionStatus(sectionKey))
   }
 
   function updateForm(updater) {
@@ -1597,11 +1631,12 @@ function DashboardPage() {
           >
             {majorTabs.map((tab, index) => {
               const angle = -90 + index * (360 / majorTabs.length)
+              const isTabComplete = getTabStatus(tab.value)
               return (
                 <button
                   key={tab.value}
                   type="button"
-                  className={`btn sidebar-radial-item ${currentTab === tab.value ? 'active' : ''}`}
+                  className={`btn sidebar-radial-item ${isTabComplete ? 'tab-complete' : 'tab-incomplete'} ${currentTab === tab.value ? 'active' : ''}`}
                   onClick={() => {
                     toggleTab(tab.value)
                     setSidebarRadialOpen(false)

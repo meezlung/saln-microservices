@@ -586,12 +586,32 @@
         color: #ffffff;
     }
 
+    .sidebar-radial-item.tab-complete {
+        background: linear-gradient(180deg, rgba(45, 134, 89, 0.96), rgba(32, 110, 68, 0.96));
+        color: #ffffff;
+    }
+
+    .sidebar-radial-item.tab-incomplete {
+        background: linear-gradient(180deg, rgba(245, 124, 0, 0.96), rgba(214, 103, 0, 0.96));
+        color: #ffffff;
+    }
+
     .sidebar-radial-item:hover,
     .sidebar-radial-item:focus-visible {
         transform: translate(-50%, -50%) rotate(var(--radial-angle)) translateY(-108px) rotate(calc(-1 * var(--radial-angle))) scale(1.03);
         box-shadow: none;
         background: linear-gradient(180deg, #0f67c0, #08467f);
         color: #ffffff;
+    }
+
+    .sidebar-radial-item.tab-complete:hover,
+    .sidebar-radial-item.tab-complete:focus-visible {
+        background: linear-gradient(180deg, rgba(58, 148, 98, 0.98), rgba(40, 124, 77, 0.98));
+    }
+
+    .sidebar-radial-item.tab-incomplete:hover,
+    .sidebar-radial-item.tab-incomplete:focus-visible {
+        background: linear-gradient(180deg, rgba(255, 145, 38, 0.98), rgba(224, 117, 11, 0.98));
     }
 
     .sidebar-menu .sidebar-radial-item:hover,
@@ -602,6 +622,26 @@
     .sidebar-radial-item.active {
         background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.08));
         color: #ffffff;
+    }
+
+    .sidebar-radial-item.tab-complete.active {
+        background: linear-gradient(135deg, rgba(45, 134, 89, 1), rgba(32, 110, 68, 1));
+        color: #ffffff;
+    }
+
+    .sidebar-radial-item.tab-incomplete.active {
+        background: linear-gradient(135deg, rgba(245, 124, 0, 1), rgba(214, 103, 0, 1));
+        color: #ffffff;
+    }
+
+    .sidebar-menu .sidebar-radial-item.tab-complete:hover,
+    .sidebar-menu .sidebar-radial-item.tab-complete:focus-visible {
+        background: linear-gradient(180deg, rgba(58, 148, 98, 1), rgba(40, 124, 77, 1));
+    }
+
+    .sidebar-menu .sidebar-radial-item.tab-incomplete:hover,
+    .sidebar-menu .sidebar-radial-item.tab-incomplete:focus-visible {
+        background: linear-gradient(180deg, rgba(255, 145, 38, 1), rgba(224, 117, 11, 1));
     }
 
     .sidebar .sidebar-nav .sidebar-section:first-child {
