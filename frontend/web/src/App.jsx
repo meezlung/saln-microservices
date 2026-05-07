@@ -1617,84 +1617,85 @@ function DashboardPage() {
 
         {/* Main Content Area */}
         <main className="dashboard-main" style={{ flex: 1, minWidth: 0 }}>
-          {notice ? <div className={`alert alert-${noticeType === 'error' ? 'error' : noticeType === 'success' ? 'success' : 'info'}`}>{notice}</div> : null}
+          <div className="dashboard-content-wrap">
+            {notice ? <div className={`alert alert-${noticeType === 'error' ? 'error' : noticeType === 'success' ? 'success' : 'info'}`}>{notice}</div> : null}
 
-          <div
-            className="dashboard-header-row"
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}
-          >
-            <div className="dashboard-header-left">
-              <h2 style={{ margin: 0 }}>SALN Form 2025</h2>
-            </div>
-            <div className="dashboard-header-right" style={{ justifyContent: 'flex-start' }}>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                <strong>Last saved:</strong> {lastSavedAt}
-              </p>
-            </div>
-          </div>
-
-          <p className="form-help" style={{ marginBottom: '20px' }}>
-            Empty fields are highlighted so you can quickly spot unfinished items.
-          </p>
-
-          {/* Form Information Tab */}
-          {currentTab === 'formInfo' && (
-            <div className="form-section" data-section="formInfo">
-              <div className="section-header" style={{ cursor: 'default' }}>
-                <div className="section-header-main">
-                  <h3>Form Information</h3>
-                  {renderSectionStatus('formInfo')}
-                </div>
+            <div
+              className="dashboard-header-row"
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}
+            >
+              <div className="dashboard-header-left">
+                <h2 style={{ margin: 0 }}>SALN Form 2025</h2>
               </div>
-              <div className="section-content active">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Compliance Type</label>
-                    <select
-                      value={formData.form_metadata?.compliance_type || ''}
-                      onChange={(e) => setMetaField('compliance_type', e.target.value)}
-                    >
-                      <option value="">Select</option>
-                      <option value="ASSUMPTION">Assumption</option>
-                      <option value="ANNUAL">Annual</option>
-                      <option value="EXIT">Exit</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>As of Date</label>
-                    <input
-                      type="date"
-                      value={formData.form_metadata?.as_of_date || ''}
-                      onChange={(e) => setMetaField('as_of_date', e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Filing Type</label>
-                    <select
-                      value={formData.form_metadata?.filing_type || ''}
-                      onChange={(e) => setMetaField('filing_type', e.target.value)}
-                    >
-                      <option value="">Select</option>
-                      <option value="JOINT">Joint</option>
-                      <option value="SEPARATE">Separate</option>
-                      <option value="NOT_APPLICABLE">Not Applicable</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ marginTop: '16px' }}>
-                  <button type="button" className="btn btn-success" onClick={handleSave}>
-                    Save
-                  </button>
-                </div>
+              <div className="dashboard-header-right" style={{ justifyContent: 'flex-start' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                  <strong>Last saved:</strong> {lastSavedAt}
+                </p>
               </div>
             </div>
-          )}
 
-          {/* Personal & Family Information Tab */}
-          {currentTab === 'personalFamily' && (
-            <>
+            <p className="form-help" style={{ marginBottom: '20px' }}>
+              Empty fields are highlighted so you can quickly spot unfinished items.
+            </p>
+
+            {/* Form Information Tab */}
+            {currentTab === 'formInfo' && (
+              <div className="form-section" data-section="formInfo">
+                <div className="section-header" style={{ cursor: 'default' }}>
+                  <div className="section-header-main">
+                    <h3>Form Information</h3>
+                    {renderSectionStatus('formInfo')}
+                  </div>
+                </div>
+                <div className="section-content active">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Compliance Type</label>
+                      <select
+                        value={formData.form_metadata?.compliance_type || ''}
+                        onChange={(e) => setMetaField('compliance_type', e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        <option value="ASSUMPTION">Assumption</option>
+                        <option value="ANNUAL">Annual</option>
+                        <option value="EXIT">Exit</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>As of Date</label>
+                      <input
+                        type="date"
+                        value={formData.form_metadata?.as_of_date || ''}
+                        onChange={(e) => setMetaField('as_of_date', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Filing Type</label>
+                      <select
+                        value={formData.form_metadata?.filing_type || ''}
+                        onChange={(e) => setMetaField('filing_type', e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        <option value="JOINT">Joint</option>
+                        <option value="SEPARATE">Separate</option>
+                        <option value="NOT_APPLICABLE">Not Applicable</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '16px' }}>
+                    <button type="button" className="btn btn-success" onClick={handleSave}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Personal & Family Information Tab */}
+            {currentTab === 'personalFamily' && (
+              <>
               {/* Personal Information Section */}
               <div className="form-section" data-section="personalInfo">
                 <div className="section-header" onClick={() => toggleSection('personalInfo')} style={{ cursor: 'pointer' }}>
@@ -2976,14 +2977,15 @@ function DashboardPage() {
             </div>
           )}
 
-          {/* Privacy Notice - visible in all tabs */}
-          <div className="privacy-notice">
-            <p style={{ fontWeight: 500, marginBottom: '8px' }}>Privacy Reminder</p>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
-              Your data will be automatically deleted after 5 days of inactivity. Export your data locally as JSON for backup.
-            </p>
+            {/* Privacy Notice - visible in all tabs */}
+            <div className="privacy-notice">
+              <p style={{ fontWeight: 500, marginBottom: '8px' }}>Privacy Reminder</p>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
+                Your data will be automatically deleted after 5 days of inactivity. Export your data locally as JSON for backup.
+              </p>
+            </div>
+            <div className="privacy-notice-spacer" aria-hidden="true" />
           </div>
-          <div className="privacy-notice-spacer" aria-hidden="true" />
         </main>
       </div>
 
