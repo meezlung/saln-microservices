@@ -90,8 +90,8 @@ final class PdfFormMapper
             'sep_filing_check_box'           => self::checkbox($filingType === 'SEPERATE' || $filingType === 'seperate'),
             'filing_not_applicable_check_box'     => self::checkbox($filingType === 'NOT_APPLICABLE' || $filingType === 'not_applicable'),
             'mult_spouse_not_applicable_check_box'=> self::checkbox($spouse === null || $spouse === []),
-            'business_check_box'  => self::checkbox($business_interests !== null || $business_interests !== []),
-            'relatives_check_box' => self::checkbox($rel_in_govt_service !== null || $rel_in_govt_service !== []),
+            'business_check_box'  => self::checkbox($temp['has_business_interest'] ?? false),
+            'relatives_check_box' => self::checkbox($temp2['has_relatives'] ?? false),
             # TODO incporate the has_business_interest and has_relatives boolean values if available instead of just checking if entries exist
 
             // declarant

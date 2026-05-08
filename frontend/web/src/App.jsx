@@ -103,6 +103,240 @@ function createEmptyForm() {
   }
 }
 
+function detectSALNSchema(data) {
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Invalid SALN data');
+  }
+
+  // Original schema
+  if (Object.prototype.hasOwnProperty.call(data, 'schema_version') && Object.prototype.hasOwnProperty.call(data, 'form_metadata')) {
+    return 'og';
+  }
+
+  // New schema
+  if (Object.prototype.hasOwnProperty.call(data, 'compliance_type') && Object.prototype.hasOwnProperty.call(data, 'declarant')) {
+    return 'new';
+  }
+
+  throw new Error('Unknown SALN schema');
+}
+
+function parseSpouseName(fullName) {
+  const parts = fullName.trim().split(/\s+/);
+
+  const first_name = parts.shift() || '';
+  const last_name = parts.pop() || '';
+
+  let middle_initial = '';
+
+  if (parts.length > 0) {
+    middle_initial = parts
+      .map(part => {
+        const cleaned = part.replace(/\./g, '');
+
+        return cleaned.length === 1
+          ? cleaned.toUpperCase()
+          : cleaned[0].toUpperCase();
+      })
+      .join('');
+  }
+
+  return {
+    first_name,
+    last_name,
+    middle_initial,
+  };
+}
+
+function getScope(owner_scope) {
+  return owner_scope === 'spouse_children'
+    ? 'spouse_children'
+    : 'declarant';
+}
+
+function mapSALN(data) {
+
+  const schema = detectSALNSchema(data);
+
+  if (schema === 'og') {
+    return data;
+    
+  } else if (schema === 'new') {
+    // map new schema to old schema
+    
+    const spouses = [];
+
+    // first spouse
+    if (data?.spouse) {
+      spouses.push({
+        is_public_official: false,
+        last_name: data.spouse.family_name || '',
+        first_name: data.spouse.first_name || '',
+        middle_initial: data.spouse.middle_initial || '',
+        position: data.spouse.position || '',
+        agency_office: data.spouse.agency_office || '',
+        office_address: data.spouse.office_address || '',
+      });
+    };
+
+    // addtional spouses
+    (data?.additional_spouses || []).forEach((spouse) => {
+     const parsed = parseSpouseName(spouse?.name || '');
+
+      spouses.push({
+        is_public_official: false,
+        ...parsed,
+        position: '',
+        agency_office: '',
+        office_address: '',
+      });
+    });
+
+    const children_below_18 = (data?.children || []).map((child) => ({
+      name: child?.name || '',
+      birthday: child?.date_of_birth || '',
+    }));
+
+    const assets = {
+      declarant: {
+        real_properties: [],
+        personal_properties: [],
+      },
+
+      spouse_children: {
+        real_properties: [],
+        personal_properties: [],
+      },
+    };
+
+    const business_interests = {
+      declarant: {
+        has_business_interest: false,
+        entries: [],
+      },
+
+      spouse_children: {
+        has_business_interest: false,
+        entries: [],
+      },
+    };
+
+    const liabilities = {
+      declarant: [],
+      spouse_children: [],  
+    };
+
+    const relatives_in_government = {
+      has_relatives: false,
+      entries: [],
+    };
+
+    (data?.real_properties || []).forEach((property) => {
+      const scope = getScope(property?.owner_scope)
+
+      assets[scope].real_properties.push({
+        description: property?.description || '',
+        kind: property?.kind || '',
+        exact_location: property?.exact_location || '',
+        assessed_value: property?.assessed_value || '',
+        fair_market_value: property?.current_fair_market_value || '',
+
+        acquisition: {
+          year: property?.year_of_acquisition || '',
+          mode: property?.mode_of_acquisition || '',
+          cost: property?.acquisition_cost || '',
+        },
+      });
+    });
+
+    (data?.personal_properties || []).forEach((property) => {
+      const scope = getScope(property?.owner_scope)
+
+      assets[scope].personal_properties.push({
+        description: property?.description || '',
+        acquisition_year: property?.acquisition_year || '',
+        acquisition_cost: property?.acquisition_cost_amount || '',
+      });
+    });
+
+    (data?.business_interests || []).forEach((entry) => {
+      const scope = getScope(entry?.owner_scope)
+
+      business_interests[scope].entries.push({
+        entity_name:
+          entry?.name_of_entity_or_business_enterprise || '',
+
+        business_address:
+          entry?.business_address || '',
+
+        nature_of_interest:
+          entry?.nature_of_business_interest_or_financial_connection || '',
+
+        date_acquired:
+          entry?.date_of_acquisition || '',
+      });
+
+      business_interests[scope].has_business_interest = true;
+    });
+
+    (data?.liabilities || []).forEach((entry) => {
+      const scope = getScope(entry?.owner_scope)
+
+      liabilities[scope].push({
+        nature: entry?.nature || '',
+
+        creditor_name: entry?.name_of_creditor || '',
+
+        outstanding_balance: entry?.outstanding_balance || '',
+      });
+    });
+
+    (data?.relatives_in_government_service || []).forEach((entry) => {
+      relatives_in_government.has_relatives = true;
+      relatives_in_government.entries.push({
+        relative_name: entry?.name_of_relative || '',
+        relationship: entry?.relationship || '',
+        position: entry?.position || '',
+        agency_office: entry?.name_of_agency_office_and_address || '',
+      });
+    });
+
+    return {
+        form_metadata: {
+          form_type: "SALN_2025",
+          compliance_type: data?.compliance_type?.toUpperCase() || 'ASSUMPTION',
+          as_of_date: data?.assumption_date || '',
+          filing_type: data?.filing_type?.toUpperCase() || 'JOINT',
+        },
+        declarant: {
+          personal_information: {
+            last_name: data?.declarant?.family_name || '',
+            first_name: data?.declarant?.first_name || '',
+            middle_initial: data?.declarant?.middle_initial || '',
+            position: data?.declarant?.position || '',
+            agency_office: data?.declarant?.agency_office || '',
+            office_address: data?.declarant?.office_address || '',
+            government_id: {
+              type: '',
+              id_number: '',
+              date_issued: '',
+            }
+          }
+        },
+        spouses,
+        children_below_18,
+        assets,
+        liabilities,
+        business_interests,
+        relatives_in_government,
+        certification: {
+          date_signed: null,
+          authorization_to_verify: false
+        }
+    }
+  }
+}
+
 function normalizeFormData(raw) {
   const base = createEmptyForm()
   const data = raw && typeof raw === 'object' ? raw : {}
@@ -1373,13 +1607,17 @@ function DashboardPage() {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
-      await formApi.importData(parsed)
-      setFormData(normalizeFormData(parsed))
+
+      const new_parsed = mapSALN(parsed)
+
+      await formApi.importData(new_parsed)
+      setFormData(normalizeFormData(new_parsed))
       setStatusText('Draft')
       setIsDirty(false)
       setNoticeType('success')
       setNotice('Form imported successfully.')
-    } catch {
+    } catch (err) {
+      console.error(err);
       setNoticeType('error')
       setNotice('Invalid JSON file.')
     } finally {
