@@ -8,11 +8,9 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -144,7 +142,6 @@ class AuthController extends Controller
             $user = User::create([
                 'name' => explode('@', $email)[0],
                 'email' => $email,
-                'password' => Hash::make(Str::random(40)),
                 'last_activity_at' => now(),
             ]);
         }

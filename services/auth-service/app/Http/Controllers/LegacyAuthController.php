@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -49,7 +48,6 @@ class AuthController extends Controller
         $request->validate([
             'email' => 'required|email',
             'code' => 'required|string|size:6',
-            'password' => 'required|string|min:8',
         ]);
 
         $verification = DB::table('verification_codes')
@@ -83,8 +81,6 @@ class AuthController extends Controller
                 $user->forms()->delete();
             }
             
-            // Update password
-            $user->password = Hash::make($request->password);
             $user->last_activity_at = now();
             $user->save();
         } else {
@@ -92,7 +88,6 @@ class AuthController extends Controller
             $user = User::create([
                 'name' => explode('@', $request->email)[0],
                 'email' => $request->email,
-                'password' => Hash::make($request->password),
                 'last_activity_at' => now(),
             ]);
         }
