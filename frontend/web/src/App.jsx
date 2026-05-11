@@ -11,7 +11,6 @@ import {
 } from './lib/api'
 
 const THEME_STORAGE_KEY = 'theme'
-const WHOLE_NUMBER_REGEX = /^\d*$/
 const DECIMAL_NUMBER_REGEX = /^\d*(\.\d{0,2})?$/
 const PDF_POLL_INTERVAL_MS = 2000
 const PDF_POLL_MAX_ATTEMPTS = 30
@@ -469,6 +468,214 @@ function sleep(ms) {
   })
 }
 
+function computeSectionEmptyCounts(formData, numericFieldErrors) {
+  const counts = {
+    formInfo: 0,
+    personalInfo: 0,
+    spouseInfo: 0,
+    childrenInfo: 0,
+    realProperties: 0,
+    personalProperties: 0,
+    liabilities: 0,
+    business: 0,
+    relatives: 0,
+    certification: 0,
+  }
+
+  const hasError = (key) => {
+    if (!key) {
+      return false
+    }
+    return !!numericFieldErrors?.[key]
+  }
+
+  const countField = (section, value, errorKey) => {
+    if (!section || !(section in counts)) {
+      return
+    }
+
+    if (hasError(errorKey)) {
+      counts[section] += 1
+      return
+    }
+
+    const normalized = String(value ?? '').trim()
+    if (normalized === '') {
+      counts[section] += 1
+    }
+  }
+
+  // Form Information
+  countField('formInfo', formData?.form_metadata?.compliance_type)
+  countField('formInfo', formData?.form_metadata?.as_of_date)
+  countField('formInfo', formData?.form_metadata?.filing_type)
+
+  // Personal Information
+  const personal = formData?.declarant?.personal_information
+  countField('personalInfo', personal?.last_name)
+  countField('personalInfo', personal?.first_name)
+  countField('personalInfo', personal?.middle_initial)
+  countField('personalInfo', personal?.position)
+  countField('personalInfo', personal?.agency_office)
+  countField('personalInfo', personal?.office_address)
+  countField('personalInfo', personal?.government_id?.type)
+  countField('personalInfo', personal?.government_id?.id_number)
+  countField('personalInfo', personal?.government_id?.date_issued)
+
+  // Spouse Information
+  const spouses = Array.isArray(formData?.spouses) ? formData.spouses : []
+  spouses.forEach((spouse) => {
+    if (!spouse) {
+      return
+    }
+    countField('spouseInfo', spouse.last_name)
+    countField('spouseInfo', spouse.first_name)
+    countField('spouseInfo', spouse.middle_initial)
+    if (spouse.is_public_official) {
+      countField('spouseInfo', spouse.position)
+      countField('spouseInfo', spouse.agency_office)
+      countField('spouseInfo', spouse.office_address)
+    }
+  })
+
+  // Children Below 18
+  const children = Array.isArray(formData?.children_below_18) ? formData.children_below_18 : []
+  children.forEach((child, index) => {
+    if (!child) {
+      return
+    }
+    countField('childrenInfo', child.name)
+    countField('childrenInfo', child.birthday, `children_below_18.${index}.birthday`)
+  })
+
+  // Assets: Real Properties
+  ;['declarant', 'spouse_children'].forEach((bucket) => {
+    const items = formData?.assets?.[bucket]?.real_properties
+    if (!Array.isArray(items)) {
+      return
+    }
+
+    items.forEach((item, index) => {
+      if (!item) {
+        return
+      }
+
+      if (bucket === 'spouse_children') {
+        countField('realProperties', item.owner_ref)
+      }
+
+      countField('realProperties', item.description)
+      countField('realProperties', item.kind)
+      countField('realProperties', item.exact_location)
+      countField('realProperties', item.assessed_value, `assets.${bucket}.real_properties.${index}.assessed_value`)
+      countField('realProperties', item.fair_market_value, `assets.${bucket}.real_properties.${index}.fair_market_value`)
+      countField('realProperties', item.acquisition?.year)
+      countField('realProperties', item.acquisition?.mode)
+      countField('realProperties', item.acquisition?.cost, `assets.${bucket}.real_properties.${index}.acquisition.cost`)
+    })
+  })
+
+  // Assets: Personal Properties
+  ;['declarant', 'spouse_children'].forEach((bucket) => {
+    const items = formData?.assets?.[bucket]?.personal_properties
+    if (!Array.isArray(items)) {
+      return
+    }
+
+    items.forEach((item, index) => {
+      if (!item) {
+        return
+      }
+
+      if (bucket === 'spouse_children') {
+        countField('personalProperties', item.owner_ref)
+      }
+
+      countField('personalProperties', item.description)
+      countField('personalProperties', item.acquisition_year)
+      countField(
+        'personalProperties',
+        item.acquisition_cost,
+        `assets.${bucket}.personal_properties.${index}.acquisition_cost`,
+      )
+    })
+  })
+
+  // Liabilities
+  ;['declarant', 'spouse_children'].forEach((bucket) => {
+    const items = formData?.liabilities?.[bucket]
+    if (!Array.isArray(items)) {
+      return
+    }
+
+    items.forEach((item, index) => {
+      if (!item) {
+        return
+      }
+
+      if (bucket === 'spouse_children') {
+        countField('liabilities', item.owner_ref)
+      }
+
+      countField('liabilities', item.nature)
+      countField('liabilities', item.creditor_name)
+      countField('liabilities', item.outstanding_balance, `liabilities.${bucket}.${index}.outstanding_balance`)
+    })
+  })
+
+  // Business Interests & Financial Connections
+  const businessDeclarant = formData?.business_interests?.declarant
+  if (businessDeclarant?.has_business_interest) {
+    const entries = Array.isArray(businessDeclarant.entries) ? businessDeclarant.entries : []
+    entries.forEach((entry) => {
+      if (!entry) {
+        return
+      }
+      countField('business', entry.entity_name)
+      countField('business', entry.business_address)
+      countField('business', entry.nature_of_interest)
+      countField('business', entry.date_acquired)
+    })
+  }
+
+  const businessSpouseChildren = formData?.business_interests?.spouse_children
+  if (businessSpouseChildren?.has_business_interest) {
+    const entries = Array.isArray(businessSpouseChildren.entries) ? businessSpouseChildren.entries : []
+    entries.forEach((entry) => {
+      if (!entry) {
+        return
+      }
+      countField('business', entry.owner_ref)
+      countField('business', entry.entity_name)
+      countField('business', entry.business_address)
+      countField('business', entry.nature_of_interest)
+      countField('business', entry.date_acquired)
+    })
+  }
+
+  // Relatives in Government Service
+  const relatives = formData?.relatives_in_government
+  if (relatives?.has_relatives) {
+    const entries = Array.isArray(relatives.entries) ? relatives.entries : []
+    entries.forEach((entry) => {
+      if (!entry) {
+        return
+      }
+      countField('relatives', entry.relative_name)
+      countField('relatives', entry.relationship)
+      countField('relatives', entry.position)
+      countField('relatives', entry.agency_office)
+    })
+  }
+
+  // Certification
+  if (!formData?.certification?.authorization_to_verify) {
+    counts.certification = 1
+  }
+
+  return counts
+}
+
 function App() {
   const [theme, setTheme] = useState(getInitialTheme)
 
@@ -780,8 +987,11 @@ function DashboardPage() {
   const [sidebarRadialOpen, setSidebarRadialOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isDirty, setIsDirty] = useState(false)
-  const [sectionEmptyCounts, setSectionEmptyCounts] = useState({})
   const [numericFieldErrors, setNumericFieldErrors] = useState({})
+  const sectionEmptyCounts = useMemo(
+    () => computeSectionEmptyCounts(formData, numericFieldErrors),
+    [formData, numericFieldErrors],
+  )
 
   const formDataRef = useRef(formData)
   const dirtyRef = useRef(isDirty)
@@ -1201,23 +1411,6 @@ function DashboardPage() {
         const hasValidationError = field.getAttribute('aria-invalid') === 'true'
         field.classList.toggle('field-empty', value === '' || hasValidationError)
       })
-
-      const nextCounts = {}
-      const sections = formRoot.querySelectorAll('[data-section]')
-
-      sections.forEach((section) => {
-        const key = section.dataset.section
-        if (!key) {
-          return
-        }
-
-        nextCounts[key] = section.querySelectorAll('.field-empty').length
-      })
-
-      setSectionEmptyCounts((prev) => ({
-        ...prev,
-        ...nextCounts,
-      }))
     }
 
     applyEmptyIndicators()
@@ -1256,7 +1449,7 @@ function DashboardPage() {
       formRoot.removeEventListener('input', scheduleApplyEmptyIndicators)
       formRoot.removeEventListener('change', scheduleApplyEmptyIndicators)
     }
-  }, [formData, openSections, loading])
+  }, [formData, openSections, numericFieldErrors, loading])
 
   function renderSectionStatus(sectionKey) {
     const sectionAliases = {
