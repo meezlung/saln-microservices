@@ -1890,7 +1890,7 @@ function DashboardPage() {
 
         {/* Main Content Area */}
         <main className="dashboard-main" style={{ flex: 1, minWidth: 0 }}>
-          <div className="dashboard-content-wrap">
+          <div className="container dashboard-content-wrap">
             {notice ? <div className={`alert alert-${noticeType === 'error' ? 'error' : noticeType === 'success' ? 'success' : 'info'}`}>{notice}</div> : null}
 
             <div

@@ -215,7 +215,7 @@
     .dashboard-shell {
         display: flex;
         gap: 24px;
-        padding: 24px 24px 80px;
+        padding: 24px 0 80px;
         box-sizing: border-box;
         width: 100%;
         flex: 1;
@@ -230,8 +230,6 @@
 
     .dashboard-content-wrap {
         width: 100%;
-        max-width: 1280px;
-        margin: 0 auto;
     }
 
     .dashboard-header-row {
@@ -278,7 +276,7 @@
 
     @media (max-width: 768px) {
         .dashboard-shell {
-            padding: 16px 16px 64px;
+            padding: 16px 0 64px;
             gap: 16px;
             flex-direction: column;
         }
