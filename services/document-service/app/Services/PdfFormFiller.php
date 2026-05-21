@@ -16,7 +16,8 @@ class PdfFormFiller
             throw new RuntimeException("Template PDF not found: {$pdfPath}");
         }
 
-        $outDir = storage_path("app/tmp");
+        // Lambda /var/task is read-only; use system temp dir (/tmp in Lambda)
+        $outDir = sys_get_temp_dir() . '/saln';
         if (!is_dir($outDir)) {
             mkdir($outDir, 0775, true);
         }

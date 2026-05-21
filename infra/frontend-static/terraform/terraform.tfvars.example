@@ -1,0 +1,18 @@
+project_name      = "saln"
+aws_region        = "ap-southeast-1"
+
+# If empty, Terraform generates one like "saln-frontend-<random>"
+bucket_name       = ""
+
+# Optional custom frontend domain and ACM certificate (CloudFront cert must be in us-east-1)
+cloudfront_aliases   = ["saln1a.upcsweb.dev"]
+acm_certificate_arn  = ""
+
+# API origin that CloudFront will forward /api/* requests to.
+# Examples:
+# - API Gateway execute-api domain: "abc123.execute-api.ap-southeast-1.amazonaws.com"
+# - API custom domain: "api.saln.example.edu"
+api_origin_domain = "CHANGE-ME"
+
+# https-only recommended
+api_origin_protocol_policy = "https-only"

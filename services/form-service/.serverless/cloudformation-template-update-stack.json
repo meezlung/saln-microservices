@@ -1,0 +1,295 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The AWS CloudFormation template for this Serverless application",
+  "Resources": {
+    "WebLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/saln-form-service-dev-web"
+      }
+    },
+    "ArtisanLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/saln-form-service-dev-artisan"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "saln-form-service",
+                  "dev",
+                  "lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:TagResource"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/saln-form-service-dev*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/saln-form-service-dev*:*:*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              "saln-form-service",
+              "dev",
+              {
+                "Ref": "AWS::Region"
+              },
+              "lambdaRole"
+            ]
+          ]
+        }
+      }
+    },
+    "WebLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "serverless-framework-deployments-ap-southeast-2-db0adffd-7aa3",
+          "S3Key": "serverless/saln-form-service/dev/1779381278731-2026-05-21T16:34:38.731Z/saln-form-service.zip"
+        },
+        "Handler": "public/index.php",
+        "Runtime": "provided.al2",
+        "FunctionName": "saln-form-service-dev-web",
+        "MemorySize": 1024,
+        "Timeout": 28,
+        "Environment": {
+          "Variables": {
+            "APP_ENV": "production",
+            "APP_DEBUG": "false",
+            "APP_KEY": "base64:QLUKq6RTtnUC53S8L7RQo/akNkKlHVKgnS6pepqMfDA=",
+            "LAMBDA_PATH_PREFIX": "/api/forms",
+            "LAMBDA_PATH_REPLACE": "/api",
+            "AUTH_SERVICE_URL": "https://mssvj54wi2c4wo3lmscdsbbkeq0yutep.lambda-url.ap-southeast-2.on.aws",
+            "AUTH_SERVICE_ME_URL": "",
+            "INTERNAL_SERVICE_TOKEN": "saln-internal-svc-token-cs173",
+            "DB_CONNECTION": "pgsql",
+            "DB_HOST": "saln-db.cluster-cgray6mayg8s.us-east-1.rds.amazonaws.com",
+            "DB_PORT": "5432",
+            "DB_DATABASE": "saln_form_db",
+            "DB_USERNAME": "postgres",
+            "DB_PASSWORD": "i-love-cs173",
+            "DB_SSLMODE": "require",
+            "SESSION_DRIVER": "cookie",
+            "CACHE_STORE": "array",
+            "QUEUE_CONNECTION": "sync",
+            "LOG_CHANNEL": "stderr"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        },
+        "Layers": [
+          "arn:aws:lambda:ap-southeast-2:534081306603:layer:php-84-fpm:40",
+          "arn:aws:lambda:ap-southeast-2:403367587399:layer:pgsql-php-84:4"
+        ]
+      },
+      "DependsOn": [
+        "WebLogGroup"
+      ]
+    },
+    "ArtisanLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "serverless-framework-deployments-ap-southeast-2-db0adffd-7aa3",
+          "S3Key": "serverless/saln-form-service/dev/1779381278731-2026-05-21T16:34:38.731Z/saln-form-service.zip"
+        },
+        "Handler": "artisan",
+        "Runtime": "provided.al2",
+        "FunctionName": "saln-form-service-dev-artisan",
+        "MemorySize": 1024,
+        "Timeout": 120,
+        "Environment": {
+          "Variables": {
+            "APP_ENV": "production",
+            "APP_DEBUG": "false",
+            "APP_KEY": "base64:QLUKq6RTtnUC53S8L7RQo/akNkKlHVKgnS6pepqMfDA=",
+            "LAMBDA_PATH_PREFIX": "/api/forms",
+            "LAMBDA_PATH_REPLACE": "/api",
+            "AUTH_SERVICE_URL": "https://mssvj54wi2c4wo3lmscdsbbkeq0yutep.lambda-url.ap-southeast-2.on.aws",
+            "AUTH_SERVICE_ME_URL": "",
+            "INTERNAL_SERVICE_TOKEN": "saln-internal-svc-token-cs173",
+            "DB_CONNECTION": "pgsql",
+            "DB_HOST": "saln-db.cluster-cgray6mayg8s.us-east-1.rds.amazonaws.com",
+            "DB_PORT": "5432",
+            "DB_DATABASE": "saln_form_db",
+            "DB_USERNAME": "postgres",
+            "DB_PASSWORD": "i-love-cs173",
+            "DB_SSLMODE": "require",
+            "SESSION_DRIVER": "cookie",
+            "CACHE_STORE": "array",
+            "QUEUE_CONNECTION": "sync",
+            "LOG_CHANNEL": "stderr"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        },
+        "Layers": [
+          "arn:aws:lambda:ap-southeast-2:534081306603:layer:php-84:41",
+          "arn:aws:lambda:ap-southeast-2:534081306603:layer:console:120",
+          "arn:aws:lambda:ap-southeast-2:403367587399:layer:pgsql-php-84:4"
+        ]
+      },
+      "DependsOn": [
+        "ArtisanLogGroup"
+      ]
+    },
+    "WebLambdaVersionuCe2hgVqo91qfz9HJgQyhExpPdcSVyKXaFIs4H6QMU": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "WebLambdaFunction"
+        },
+        "CodeSha256": "cGiVNQFDTp5ldN2KJznQTlSEOogGOyANkw+O9xTAnmo="
+      }
+    },
+    "WebLambdaFunctionUrl": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "AuthType": "NONE",
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "WebLambdaFunction",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "WebLambdaPermissionFnUrl": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "WebLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunctionUrl",
+        "Principal": "*",
+        "FunctionUrlAuthType": "NONE"
+      }
+    },
+    "WebLambdaPermissionFnUrlInvokeFunction": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "WebLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "*",
+        "InvokedViaFunctionUrl": true
+      }
+    },
+    "ArtisanLambdaVersiont4uEqdxcd0XwSUbWxZfvxbsuNTfqdun5DI5uotR3Kk": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "ArtisanLambdaFunction"
+        },
+        "CodeSha256": "cGiVNQFDTp5ldN2KJznQTlSEOogGOyANkw+O9xTAnmo="
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessDeploymentBucketName": {
+      "Value": "serverless-framework-deployments-ap-southeast-2-db0adffd-7aa3",
+      "Export": {
+        "Name": "sls-saln-form-service-dev-ServerlessDeploymentBucketName"
+      }
+    },
+    "WebLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "WebLambdaVersionuCe2hgVqo91qfz9HJgQyhExpPdcSVyKXaFIs4H6QMU"
+      },
+      "Export": {
+        "Name": "sls-saln-form-service-dev-WebLambdaFunctionQualifiedArn"
+      }
+    },
+    "WebLambdaFunctionUrl": {
+      "Description": "Lambda Function URL",
+      "Value": {
+        "Fn::GetAtt": [
+          "WebLambdaFunctionUrl",
+          "FunctionUrl"
+        ]
+      },
+      "Export": {
+        "Name": "sls-saln-form-service-dev-WebLambdaFunctionUrl"
+      }
+    },
+    "ArtisanLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "ArtisanLambdaVersiont4uEqdxcd0XwSUbWxZfvxbsuNTfqdun5DI5uotR3Kk"
+      },
+      "Export": {
+        "Name": "sls-saln-form-service-dev-ArtisanLambdaFunctionQualifiedArn"
+      }
+    }
+  }
+}

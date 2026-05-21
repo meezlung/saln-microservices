@@ -262,8 +262,11 @@ class GeneratePdfJob implements ShouldQueue
                 }
             }
 
-            // merge into final
-            $mergedTmpDir = storage_path("app/tmp");
+            // merge into final — use system temp dir (/tmp in Lambda, /var/task is read-only)
+            $mergedTmpDir = sys_get_temp_dir() . '/saln';
+            if (!is_dir($mergedTmpDir)) {
+                mkdir($mergedTmpDir, 0775, true);
+            }
             $mergedTmpPath = "{$mergedTmpDir}/SALN-merged.pdf";
             
             $pdf = new Pdf($fileTempPaths);
@@ -274,7 +277,7 @@ class GeneratePdfJob implements ShouldQueue
             }
             
             $fileName = "generated/SALN-{$doc->public_id}.pdf";
-            Storage::disk('local')->put($fileName, file_get_contents($mergedTmpPath));
+            Storage::put($fileName, file_get_contents($mergedTmpPath));
 
             // del temps
             if (is_file($mergedTmpPath) && !unlink($mergedTmpPath)) {

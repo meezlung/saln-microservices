@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GeneratePdfJob;
 use App\Models\Document;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -100,17 +101,19 @@ class DocumentController extends Controller
             ], 409);
         }
 
-        if (!Storage::disk('local')->exists($doc->output_path)) {
+        if (!Storage::exists($doc->output_path)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Generated file is missing from storage.',
             ], 404);
         }
 
-        $absolutePath = Storage::disk('local')->path($doc->output_path);
         $filename = "SALN-{$doc->public_id}.pdf";
+        $stream = Storage::readStream($doc->output_path);
 
-        return response()->file($absolutePath, [
+        return response()->stream(function () use ($stream) {
+            fpassthru($stream);
+        }, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$filename.'"',
         ]);
@@ -130,17 +133,22 @@ class DocumentController extends Controller
             ], 409);
         }
 
-        if (!Storage::disk('local')->exists($doc->output_path)) {
+        if (!Storage::exists($doc->output_path)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Generated file is missing from storage.',
             ], 404);
         }
 
-        return Storage::disk('local')->download(
-            $doc->output_path,
-            "SALN-{$doc->public_id}.pdf"
-        );
+        $stream = Storage::readStream($doc->output_path);
+        $filename = "SALN-{$doc->public_id}.pdf";
+
+        return response()->stream(function () use ($stream) {
+            fpassthru($stream);
+        }, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     public function purge(Request $request): JsonResponse
@@ -155,8 +163,8 @@ class DocumentController extends Controller
         $docs = Document::where('owner_user_id', $userId)->get();
 
         foreach ($docs as $doc) {
-            if ($doc->output_path && Storage::disk('local')->exists($doc->output_path)) {
-                Storage::disk('local')->delete($doc->output_path);
+            if ($doc->output_path && Storage::exists($doc->output_path)) {
+                Storage::delete($doc->output_path);
             }
         }
 

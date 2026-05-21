@@ -17,12 +17,23 @@ const documentClient = axios.create({
 
 function attachAuth(config) {
   const token = getAuthToken()
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
+}
+
+function attachDocumentAuth(config) {
+  const token = getAuthToken()
   const user = getCurrentUser()
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
 
+  // The document Lambda validates identity via X-User-Id directly
   if (user?.id) {
     config.headers['X-User-Id'] = user.id
   }
@@ -32,7 +43,7 @@ function attachAuth(config) {
 
 authClient.interceptors.request.use(attachAuth)
 formClient.interceptors.request.use(attachAuth)
-documentClient.interceptors.request.use(attachAuth)
+documentClient.interceptors.request.use(attachDocumentAuth)
 
 function handleUnauthorized(error) {
   if (error?.response?.status === 401) {
@@ -97,4 +108,8 @@ export const formApi = {
 export const documentApi = {
   generate: (formData) => documentClient.post('/generate', { form_data: formData }),
   show: (documentId) => documentClient.get(`/${documentId}`),
+  downloadBlob: async (documentId) => {
+    const response = await documentClient.get(`/${documentId}/download`, { responseType: 'blob' })
+    return response.data
+  },
 }

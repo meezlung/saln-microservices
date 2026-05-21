@@ -19,10 +19,10 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/forms/, '/api'),
       },
       '/api/documents': {
-        target: 'http://127.0.0.1:8003',
+        target: 'https://g3ko3niymhwubahdzugkholgiy0pnbcd.lambda-url.ap-southeast-2.on.aws',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api\/documents/, '/api'),
+        // Lambda expects full /api/documents/* paths — no rewrite needed
       },
     },
   },

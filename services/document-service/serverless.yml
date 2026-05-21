@@ -1,0 +1,54 @@
+# pdftk setup: download a pdftk binary compiled for Amazon Linux 2 and place it at:
+#   services/document-service/bin/pdftk   (make it executable: chmod +x bin/pdftk)
+# A pre-compiled binary can be obtained from:
+#   https://github.com/nicholasdille/pdftk-layer/releases  (use the al2 build)
+# public/index.php adds bin/ to PATH automatically when running in Lambda.
+
+service: saln-document-service
+
+provider:
+  name: aws
+  region: ap-southeast-2
+  runtime: provided.al2023
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+          Resource: arn:aws:s3:::YOUR_PDF_BUCKET_NAME/*
+  environment:
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_KEY: "base64:tRqN8FfOyyR5sUE/KWEaYMSfBmbj6+xoNfRrmw9eDvs="
+    APP_URL: https://d1r7w8bsv7kk25.cloudfront.net
+    LAMBDA_PATH_PREFIX: /api/documents
+    # Set AUTH_SERVICE_URL to your auth Lambda Function URL after deploying auth first
+    AUTH_SERVICE_URL: https://AUTH_LAMBDA_URL_HERE
+    AUTH_SERVICE_ME_URL: ""
+    INTERNAL_SERVICE_TOKEN: YOUR_INTERNAL_SECRET_TOKEN
+    DB_CONNECTION: pgsql
+    DB_HOST: YOUR_RDS_ENDPOINT
+    DB_PORT: "5432"
+    DB_DATABASE: saln_document_db
+    DB_USERNAME: postgres
+    DB_PASSWORD: YOUR_DB_PASSWORD
+    FILESYSTEM_DISK: s3
+    AWS_BUCKET: YOUR_PDF_BUCKET_NAME
+    AWS_DEFAULT_REGION: ap-southeast-2
+    SESSION_DRIVER: cookie
+    CACHE_STORE: array
+    QUEUE_CONNECTION: sync
+    LOG_CHANNEL: stderr
+
+plugins:
+  - ./vendor/bref/bref
+
+functions:
+  web:
+    handler: public/index.php
+    runtime: php-83-fpm
+    timeout: 60
+    url: true

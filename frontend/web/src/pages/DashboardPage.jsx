@@ -873,29 +873,38 @@ export default function DashboardPage() {
         throw new Error('Document ID was not returned by the service.')
       }
 
-      let documentStatus = ''
+      // The Lambda returns status:'completed' synchronously; poll only if not yet done
+      let documentStatus = response?.data?.status || ''
 
-      for (let attempt = 0; attempt < PDF_POLL_MAX_ATTEMPTS; attempt += 1) {
-        const statusResponse = await documentApi.show(documentId)
-        const payload = statusResponse?.data?.data
-        documentStatus = payload?.status || ''
+      if (documentStatus !== 'completed') {
+        for (let attempt = 0; attempt < PDF_POLL_MAX_ATTEMPTS; attempt += 1) {
+          const statusResponse = await documentApi.show(documentId)
+          const payload = statusResponse?.data?.data
+          documentStatus = payload?.status || ''
 
-        if (documentStatus === 'completed') {
-          setPreviewUrl(`/api/documents/${documentId}/preview`)
-          setDownloadUrl(`/api/documents/${documentId}/download`)
-          setShowPreviewModal(true)
-          setNoticeType('success')
-          setNotice('PDF generated. Preview is ready.')
-          return
+          if (documentStatus === 'completed') break
+
+          if (documentStatus === 'failed') {
+            throw new Error('PDF generation failed.')
+          }
+
+          if (attempt < PDF_POLL_MAX_ATTEMPTS - 1) {
+            await sleep(PDF_POLL_INTERVAL_MS)
+          }
         }
+      }
 
-        if (documentStatus === 'failed') {
-          throw new Error('PDF generation failed.')
-        }
-
-        if (attempt < PDF_POLL_MAX_ATTEMPTS - 1) {
-          await sleep(PDF_POLL_INTERVAL_MS)
-        }
+      if (documentStatus === 'completed') {
+        const downloadPath = `/api/documents/${documentId}/download`
+        // Fetch as blob so the iframe can display it inline (avoids Content-Disposition:attachment)
+        const blob = await documentApi.downloadBlob(documentId)
+        const blobUrl = URL.createObjectURL(blob)
+        setPreviewUrl(blobUrl)
+        setDownloadUrl(downloadPath)
+        setShowPreviewModal(true)
+        setNoticeType('success')
+        setNotice('PDF generated. Preview is ready.')
+        return
       }
 
       throw new Error('PDF generation timed out. Please try again in a moment.')
@@ -910,6 +919,11 @@ export default function DashboardPage() {
 
   function handleClosePreviewModal() {
     setShowPreviewModal(false)
+    // Free the blob URL created for inline PDF preview
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl('')
+    }
   }
 
   function handleDownloadPdf() {

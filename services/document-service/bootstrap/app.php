@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'auth.introspect' => \App\Http\Middleware\AuthServiceIntrospection::class,
+            'internal.token' => \App\Http\Middleware\InternalServiceToken::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

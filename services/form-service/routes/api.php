@@ -11,11 +11,12 @@ Route::get('/health', function () {
     ]);
 });
 
-Route::prefix('forms')->group(function () {
+Route::prefix('forms')->middleware('auth.introspect')->group(function () {
     Route::get('/latest', [FormApiController::class, 'latest']);
     Route::post('/save', [FormApiController::class, 'save']);
     Route::get('/export', [FormApiController::class, 'export']);
     Route::post('/import', [FormApiController::class, 'import']);
     Route::post('/new', [FormApiController::class, 'newEntry']);
-    Route::post('/purge', [FormApiController::class, 'purge']);
 });
+
+Route::post('/forms/purge', [FormApiController::class, 'purge'])->middleware('internal.token');

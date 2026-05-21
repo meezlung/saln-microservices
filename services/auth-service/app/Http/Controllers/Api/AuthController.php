@@ -189,9 +189,16 @@ class AuthController extends Controller
     private function requestFormPurge(string $userId): void
     {
         $formServiceUrl = rtrim((string) env('FORM_SERVICE_URL', 'http://127.0.0.1:8002'), '/');
+        $internalToken = (string) env('INTERNAL_SERVICE_TOKEN', '');
 
         try {
-            Http::timeout(3)->post("{$formServiceUrl}/api/forms/purge", [
+            $req = Http::timeout(3);
+
+            if ($internalToken !== '') {
+                $req = $req->withHeaders(['X-Internal-Token' => $internalToken]);
+            }
+
+            $req->post("{$formServiceUrl}/api/forms/purge", [
                 'user_id' => $userId,
             ]);
         } catch (\Throwable $e) {
@@ -205,9 +212,16 @@ class AuthController extends Controller
     private function requestDocumentPurge(string $userId): void
     {
         $documentServiceUrl = rtrim((string) env('DOCUMENT_SERVICE_URL', 'http://127.0.0.1:8003'), '/');
+        $internalToken = (string) env('INTERNAL_SERVICE_TOKEN', '');
 
         try {
-            Http::timeout(3)->post("{$documentServiceUrl}/api/documents/purge", [
+            $req = Http::timeout(3);
+
+            if ($internalToken !== '') {
+                $req = $req->withHeaders(['X-Internal-Token' => $internalToken]);
+            }
+
+            $req->post("{$documentServiceUrl}/api/documents/purge", [
                 'user_id' => $userId,
             ]);
         } catch (\Throwable $e) {

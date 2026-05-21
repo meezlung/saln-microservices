@@ -1,0 +1,311 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The AWS CloudFormation template for this Serverless application",
+  "Resources": {
+    "WebLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/saln-auth-service-dev-web"
+      }
+    },
+    "ArtisanLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/saln-auth-service-dev-artisan"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "saln-auth-service",
+                  "dev",
+                  "lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:TagResource"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/saln-auth-service-dev*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/saln-auth-service-dev*:*:*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              "saln-auth-service",
+              "dev",
+              {
+                "Ref": "AWS::Region"
+              },
+              "lambdaRole"
+            ]
+          ]
+        }
+      }
+    },
+    "WebLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "serverless-framework-deployments-ap-southeast-2-db0adffd-7aa3",
+          "S3Key": "serverless/saln-auth-service/dev/1779380908329-2026-05-21T16:28:28.329Z/saln-auth-service.zip"
+        },
+        "Handler": "public/index.php",
+        "Runtime": "provided.al2",
+        "FunctionName": "saln-auth-service-dev-web",
+        "MemorySize": 1024,
+        "Timeout": 28,
+        "Environment": {
+          "Variables": {
+            "APP_ENV": "production",
+            "APP_DEBUG": "false",
+            "APP_KEY": "base64:WmUrzBXl0nq02Dww88nFq+7drMj0EYWISR41ZljvyTY=",
+            "LAMBDA_PATH_PREFIX": "/api/auth",
+            "LAMBDA_PATH_REPLACE": "/api",
+            "DB_CONNECTION": "pgsql",
+            "DB_HOST": "saln-db.cluster-cgray6mayg8s.us-east-1.rds.amazonaws.com",
+            "DB_PORT": "5432",
+            "DB_DATABASE": "saln_auth_db",
+            "DB_USERNAME": "postgres",
+            "DB_PASSWORD": "i-love-cs173",
+            "DB_SSLMODE": "require",
+            "FORM_SERVICE_URL": "https://jtevifxhfxqequhk2bjut3muae0frbdz.lambda-url.ap-southeast-2.on.aws",
+            "DOCUMENT_SERVICE_URL": "https://DOCUMENTS_LAMBDA_URL_HERE",
+            "INTERNAL_SERVICE_TOKEN": "saln-internal-svc-token-cs173",
+            "MAIL_MAILER": "resend",
+            "MAIL_HOST": "smtp.resend.com",
+            "MAIL_PORT": "587",
+            "MAIL_USERNAME": "resend",
+            "MAIL_ENCRYPTION": "tls",
+            "MAIL_FROM_ADDRESS": "onboarding@upcsweb.dev",
+            "MAIL_FROM_NAME": "SALN Filing System",
+            "RESEND_API_KEY": "re_URNSgtt4_7yeHAuNEJrcnGWH73mGCGFm8",
+            "SESSION_DRIVER": "cookie",
+            "CACHE_STORE": "array",
+            "QUEUE_CONNECTION": "sync",
+            "LOG_CHANNEL": "stderr"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        },
+        "Layers": [
+          "arn:aws:lambda:ap-southeast-2:534081306603:layer:php-84-fpm:40",
+          "arn:aws:lambda:ap-southeast-2:403367587399:layer:pgsql-php-84:4"
+        ]
+      },
+      "DependsOn": [
+        "WebLogGroup"
+      ]
+    },
+    "ArtisanLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "serverless-framework-deployments-ap-southeast-2-db0adffd-7aa3",
+          "S3Key": "serverless/saln-auth-service/dev/1779380908329-2026-05-21T16:28:28.329Z/saln-auth-service.zip"
+        },
+        "Handler": "artisan",
+        "Runtime": "provided.al2",
+        "FunctionName": "saln-auth-service-dev-artisan",
+        "MemorySize": 1024,
+        "Timeout": 120,
+        "Environment": {
+          "Variables": {
+            "APP_ENV": "production",
+            "APP_DEBUG": "false",
+            "APP_KEY": "base64:WmUrzBXl0nq02Dww88nFq+7drMj0EYWISR41ZljvyTY=",
+            "LAMBDA_PATH_PREFIX": "/api/auth",
+            "LAMBDA_PATH_REPLACE": "/api",
+            "DB_CONNECTION": "pgsql",
+            "DB_HOST": "saln-db.cluster-cgray6mayg8s.us-east-1.rds.amazonaws.com",
+            "DB_PORT": "5432",
+            "DB_DATABASE": "saln_auth_db",
+            "DB_USERNAME": "postgres",
+            "DB_PASSWORD": "i-love-cs173",
+            "DB_SSLMODE": "require",
+            "FORM_SERVICE_URL": "https://jtevifxhfxqequhk2bjut3muae0frbdz.lambda-url.ap-southeast-2.on.aws",
+            "DOCUMENT_SERVICE_URL": "https://DOCUMENTS_LAMBDA_URL_HERE",
+            "INTERNAL_SERVICE_TOKEN": "saln-internal-svc-token-cs173",
+            "MAIL_MAILER": "resend",
+            "MAIL_HOST": "smtp.resend.com",
+            "MAIL_PORT": "587",
+            "MAIL_USERNAME": "resend",
+            "MAIL_ENCRYPTION": "tls",
+            "MAIL_FROM_ADDRESS": "onboarding@upcsweb.dev",
+            "MAIL_FROM_NAME": "SALN Filing System",
+            "RESEND_API_KEY": "re_URNSgtt4_7yeHAuNEJrcnGWH73mGCGFm8",
+            "SESSION_DRIVER": "cookie",
+            "CACHE_STORE": "array",
+            "QUEUE_CONNECTION": "sync",
+            "LOG_CHANNEL": "stderr"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        },
+        "Layers": [
+          "arn:aws:lambda:ap-southeast-2:534081306603:layer:php-84:41",
+          "arn:aws:lambda:ap-southeast-2:534081306603:layer:console:120",
+          "arn:aws:lambda:ap-southeast-2:403367587399:layer:pgsql-php-84:4"
+        ]
+      },
+      "DependsOn": [
+        "ArtisanLogGroup"
+      ]
+    },
+    "WebLambdaVersionciUWllwMItfSi0aY5b3ffMOYX1uM6WssE5K6uZAKEk": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "WebLambdaFunction"
+        },
+        "CodeSha256": "Zb+Pn33iS8htupxUzQmbuTTWRQtR0aXyEW4JQns55BQ="
+      }
+    },
+    "WebLambdaFunctionUrl": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "AuthType": "NONE",
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "WebLambdaFunction",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "WebLambdaPermissionFnUrl": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "WebLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunctionUrl",
+        "Principal": "*",
+        "FunctionUrlAuthType": "NONE"
+      }
+    },
+    "WebLambdaPermissionFnUrlInvokeFunction": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "WebLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "*",
+        "InvokedViaFunctionUrl": true
+      }
+    },
+    "ArtisanLambdaVersionyhAhdSEjZmGYfIBI3BiJYU5cdHUPvbSGqn12zcTRnBQ": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "ArtisanLambdaFunction"
+        },
+        "CodeSha256": "Zb+Pn33iS8htupxUzQmbuTTWRQtR0aXyEW4JQns55BQ="
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessDeploymentBucketName": {
+      "Value": "serverless-framework-deployments-ap-southeast-2-db0adffd-7aa3",
+      "Export": {
+        "Name": "sls-saln-auth-service-dev-ServerlessDeploymentBucketName"
+      }
+    },
+    "WebLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "WebLambdaVersionciUWllwMItfSi0aY5b3ffMOYX1uM6WssE5K6uZAKEk"
+      },
+      "Export": {
+        "Name": "sls-saln-auth-service-dev-WebLambdaFunctionQualifiedArn"
+      }
+    },
+    "WebLambdaFunctionUrl": {
+      "Description": "Lambda Function URL",
+      "Value": {
+        "Fn::GetAtt": [
+          "WebLambdaFunctionUrl",
+          "FunctionUrl"
+        ]
+      },
+      "Export": {
+        "Name": "sls-saln-auth-service-dev-WebLambdaFunctionUrl"
+      }
+    },
+    "ArtisanLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "ArtisanLambdaVersionyhAhdSEjZmGYfIBI3BiJYU5cdHUPvbSGqn12zcTRnBQ"
+      },
+      "Export": {
+        "Name": "sls-saln-auth-service-dev-ArtisanLambdaFunctionQualifiedArn"
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+service: saln-form-service
+
+provider:
+  name: aws
+  region: ap-southeast-2
+  runtime: provided.al2023
+  environment:
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_KEY: "base64:QLUKq6RTtnUC53S8L7RQo/akNkKlHVKgnS6pepqMfDA="
+    LAMBDA_PATH_PREFIX: /api/forms
+    LAMBDA_PATH_REPLACE: /api
+    # Set AUTH_SERVICE_URL to your auth Lambda Function URL after deploying auth first
+    AUTH_SERVICE_URL: https://mssvj54wi2c4wo3lmscdsbbkeq0yutep.lambda-url.ap-southeast-2.on.aws
+    AUTH_SERVICE_ME_URL: ""
+    INTERNAL_SERVICE_TOKEN: saln-internal-svc-token-cs173
+    DB_CONNECTION: pgsql
+    DB_HOST: saln-db.cluster-cgray6mayg8s.us-east-1.rds.amazonaws.com
+    DB_PORT: "5432"
+    DB_DATABASE: saln_form_db
+    DB_USERNAME: postgres
+    DB_PASSWORD: i-love-cs173
+    DB_SSLMODE: require
+    SESSION_DRIVER: cookie
+    CACHE_STORE: array
+    QUEUE_CONNECTION: sync
+    LOG_CHANNEL: stderr
+
+plugins:
+  - ./vendor/bref/bref
+
+functions:
+  web:
+    handler: public/index.php
+    runtime: php-84-fpm
+    timeout: 28
+    url: true
+    layers:
+      - arn:aws:lambda:ap-southeast-2:403367587399:layer:pgsql-php-84:4
+  artisan:
+    handler: artisan
+    runtime: php-84-console
+    timeout: 120
+    layers:
+      - arn:aws:lambda:ap-southeast-2:403367587399:layer:pgsql-php-84:4

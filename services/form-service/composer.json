@@ -10,6 +10,8 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "bref/bref": "^2.4",
+        "bref/extra-php-extensions": "^1.0",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0"
     },
