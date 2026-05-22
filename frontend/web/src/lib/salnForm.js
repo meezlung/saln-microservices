@@ -46,11 +46,6 @@ export function createEmptyForm() {
         position: '',
         agency_office: '',
         office_address: '',
-        government_id: {
-          type: '',
-          id_number: '',
-          date_issued: '',
-        },
       },
     },
     spouses: [],
@@ -281,11 +276,6 @@ export function mapSALN(data) {
           position: data?.declarant?.position || '',
           agency_office: data?.declarant?.agency_office || '',
           office_address: data?.declarant?.office_address || '',
-          government_id: {
-            type: '',
-            id_number: '',
-            date_issued: '',
-          },
         },
       },
       spouses,
@@ -356,10 +346,6 @@ export function normalizeFormData(raw) {
       personal_information: {
         ...base.declarant.personal_information,
         ...(data.declarant?.personal_information || {}),
-        government_id: {
-          ...base.declarant.personal_information.government_id,
-          ...(data.declarant?.personal_information?.government_id || {}),
-        },
       },
     },
     spouses,
@@ -504,9 +490,7 @@ export function computeSectionEmptyCounts(formData, numericFieldErrors) {
   countField('personalInfo', personal?.position)
   countField('personalInfo', personal?.agency_office)
   countField('personalInfo', personal?.office_address)
-  countField('personalInfo', personal?.government_id?.type)
-  countField('personalInfo', personal?.government_id?.id_number)
-  countField('personalInfo', personal?.government_id?.date_issued)
+
 
   const spouses = Array.isArray(formData?.spouses) ? formData.spouses : []
   spouses.forEach((spouse) => {

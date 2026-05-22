@@ -564,11 +564,6 @@ export default function DashboardPage() {
     })
   }
 
-  function setGovIdField(field, value) {
-    updateForm((next) => {
-      next.declarant.personal_information.government_id[field] = value
-    })
-  }
 
   function setNumericFieldError(key, message) {
     setNumericFieldErrors((prev) => {
@@ -1033,21 +1028,7 @@ export default function DashboardPage() {
               <textarea rows={2} value={formData.declarant?.personal_information?.office_address || ''} onChange={(e) => setPersonalField('office_address', e.target.value)} />
             </div>
 
-            <h4 style={{ marginTop: '24px', marginBottom: '16px' }}>Government ID</h4>
-            <div className="form-row">
-              <div className="form-group">
-                <label>ID Type</label>
-                <input type="text" value={formData.declarant?.personal_information?.government_id?.type || ''} onChange={(e) => setGovIdField('type', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>ID Number</label>
-                <input type="text" value={formData.declarant?.personal_information?.government_id?.id_number || ''} onChange={(e) => setGovIdField('id_number', e.target.value)} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Date Issued</label>
-              <input type="date" value={formData.declarant?.personal_information?.government_id?.date_issued || ''} onChange={(e) => setGovIdField('date_issued', e.target.value)} />
-            </div>
+
           </div>
         </div>
 
